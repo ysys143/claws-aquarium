@@ -1,6 +1,6 @@
 # OpenClaw 생태계 종합 조사 보고서
 
-> 조사일: 2026-02-24
+> 조사일: 2026-02-25 (최종 업데이트)
 > 출처: https://x.com/techNmak/status/2025659710775668814
 
 ---
@@ -15,8 +15,12 @@
 6. [PicoClaw (Go)](#6-picoclaw--go-초경량-엣지-디바이스)
 7. [TinyClaw (TypeScript)](#7-tinyclaw--typescript-멀티에이전트-팀)
 8. [Moltbook (에이전트 소셜 네트워크)](#8-moltbook--ai-에이전트-전용-소셜-네트워크)
-9. [종합 비교표](#종합-비교표)
-10. [핵심 인사이트](#핵심-인사이트)
+9. [클라우드 배포 방식들](#9-클라우드-배포-방식들)
+    - [serverless-openclaw](#91-serverless-openclaw--aws-서버리스-월-1)
+    - [OpenClaw on AWS with Bedrock](#92-openclaw-on-aws-with-bedrock--aws-공식)
+    - [KimiClaw](#93-kimiclaw--cloudflare-서버리스--moonshot-ai-공식)
+10. [종합 비교표](#종합-비교표)
+11. [핵심 인사이트](#핵심-인사이트)
     - [자격증명 딜레마](#6-자격증명-딜레마--권한을-줘야-일을-하는데-주면-위험하다)
 
 ---
@@ -620,6 +624,213 @@ Moltbook은 에이전트 보안 실패의 대표적 사례가 되었습니다.
 - [Wiz Blog — Hacking Moltbook](https://www.wiz.io/blog/exposed-moltbook-database-reveals-millions-of-api-keys)
 - [IEEE Spectrum — Moltbook and Agentic AI](https://spectrum.ieee.org/moltbook-agentic-ai-agents-openclaw)
 - [Palo Alto Networks — Agent Security](https://www.paloaltonetworks.com/blog/network-security/the-moltbook-case-and-how-we-need-to-think-about-agent-security/)
+
+---
+
+## 9. 클라우드 배포 방식들
+
+OpenClaw의 근본적 문제를 해결하지는 않지만, **더 편하게/싸게/안전하게 배포**하려는 시도들입니다.
+
+### 9.1 serverless-openclaw — AWS 서버리스 (월 ~$1)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [serithemage/serverless-openclaw](https://github.com/serithemage/serverless-openclaw) |
+| **Stars** | 126 |
+| **개발자** | 정도현 (전 AWS 테크니컬 트레이너 2016-2024, AWS 한국 사용자 그룹 리더, Roboco.io 창업자) |
+| **라이선스** | MIT |
+| **비용** | Free Tier 내 ~$0.27/월, 이후 ~$1.11/월 |
+
+#### 핵심 아키텍처
+
+OpenClaw를 AWS 서버리스로 돌려서 개인 사용 시 **월 $1** 수준으로 비용을 절감한 프로젝트입니다.
+
+| 계층 | 기술 | 역할 |
+|------|------|------|
+| 인터페이스 | React SPA (S3+CloudFront) + Telegram Bot | 사용자 접점 |
+| API | API Gateway (WebSocket + REST) | 요청 라우팅 |
+| 컴퓨팅 | Lambda 7개 (게이트웨이) + ECS Fargate Spot (에이전트) | 주문형 실행 |
+| 인증 | AWS Cognito + JWT | 모든 요청에 인증 |
+| 저장 | DynamoDB 5개 테이블 + S3 | 대화 히스토리, 파일 |
+
+#### 비용 절감 핵심
+
+| 제거한 것 | 절약액 |
+|-----------|--------|
+| ALB (Application Load Balancer) | -$18~25/월 |
+| NAT Gateway | -$33/월 |
+| 상시 가동 인스턴스 | 사용 안 할 때 $0 |
+| + Fargate Spot (70% 할인) + ARM64 Graviton | 추가 절감 |
+
+#### 보안 개선점
+
+- Cognito JWT 인증 (OpenClaw 기본은 인증 없음)
+- SSM Parameter Store로 시크릿 관리 ("디스크에 시크릿 기록 안 함" 원칙)
+- HTTPS 강제 (CloudFront + API Gateway)
+- 최소 권한 IAM 역할
+
+#### 한계
+
+- OpenClaw 앱 레벨 취약점(CVE-2026-25253 등)은 여전히 존재
+- 프롬프트 인젝션, ClawHub 악성 스킬 문제 미해결
+- 콜드 스타트 ~68초 (프리워밍 시 ~0초, +$0.07/월)
+
+#### 참고 링크
+
+- [GitHub — serithemage/serverless-openclaw](https://github.com/serithemage/serverless-openclaw)
+- [serithemage GitHub 프로필](https://github.com/serithemage)
+
+---
+
+### 9.2 OpenClaw on AWS with Bedrock — AWS 공식
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [aws-samples/sample-OpenClaw-on-AWS-with-Bedrock](https://github.com/aws-samples/sample-OpenClaw-on-AWS-with-Bedrock) |
+| **Stars** | 359 |
+| **만든 곳** | AWS (aws-samples 공식 레포) |
+| **라이선스** | MIT-0 |
+| **비용** | ~$46/월 (EC2 + VPC 엔드포인트, 모델 비용 별도) |
+
+#### 핵심 아키텍처
+
+OpenClaw + Amazon Bedrock → **API 키 없이** IAM 역할로 LLM 인증.
+
+```
+사용자 메시징 앱 → EC2 (OpenClaw Gateway) → Amazon Bedrock → LLM 응답
+```
+
+| AWS 서비스 | 역할 |
+|-----------|------|
+| Amazon Bedrock | 통합 LLM 추론 API |
+| EC2 (Graviton ARM) | OpenClaw 게이트웨이 실행 |
+| IAM | 역할 기반 인증 (API 키 저장 불필요) |
+| VPC + PrivateLink | Bedrock 트래픽이 퍼블릭 인터넷을 안 탐 |
+| CloudTrail | 모든 API 호출 감사 로깅 |
+| SSM Session Manager | SSH 포트 노출 없이 접근 |
+
+#### Bedrock의 장점
+
+**1. API 키가 아예 없음**
+- IAM 역할이 자동 인증 → 키 회전/노출/커밋 사고 불가능
+
+**2. 모델 자유 선택**
+- AWS 계정 하나로 Bedrock 카탈로그 전체 접근:
+
+| 모델 | 제공사 | 특징 |
+|------|--------|------|
+| Claude Sonnet 4.5 / Opus 4.6 | Anthropic | 최고 성능 |
+| Amazon Nova 2 Lite | Amazon | Claude 대비 **73-90% 저렴** |
+| DeepSeek R1 | DeepSeek | 오픈소스, 추론 강점 |
+| Llama 3.3 70B | Meta | 오픈소스 |
+| Kimi K2.5 | Moonshot AI | 262K 컨텍스트 |
+
+**3. 통합 빌링**
+- 모든 LLM 비용이 하나의 AWS 청구서로. AWS 크레딧 적용 가능.
+
+**4. 비용 절감 사례**
+- 한 개발자가 Claude Sonnet 직접 사용 ~$1,000/월 → Amazon Q Developer Pro 경유 **~$20/월**로 절감
+
+#### AWS의 전략적 의도
+
+`aws-samples` 공식 레포라는 건 AWS가 **Bedrock으로 트래픽을 유도하려는 전략적 목적**이 있다는 의미입니다. OpenClaw 유저가 Anthropic API 직접 호출 대신 Bedrock을 경유하면 AWS가 이득. Kiro IDE 통합, AgentCore Runtime 지원까지 포함된 **멀티 제품 쇼케이스**입니다.
+
+#### 보안: 인프라는 좋지만 앱은 여전히 취약
+
+**AWS가 개선하는 것:**
+- IAM → 자격증명 파일 노출 위험 제거
+- VPC 엔드포인트 → 네트워크 트래픽 격리
+- CloudTrail → 이상 행동 감사
+- Security Group → 불필요한 포트 차단
+
+**AWS가 못 고치는 것:**
+- CVE-2026-25253 (1-click RCE) — 앱 레벨 버그
+- 프롬프트 인젝션 — 이메일의 악성 프롬프트가 API 키 탈취 시연됨
+- ClawHub 악성 스킬 (~20%) — 공급망 공격
+- 512개 취약점 중 8개 Critical
+
+#### 참고 링크
+
+- [GitHub — aws-samples/sample-OpenClaw-on-AWS-with-Bedrock](https://github.com/aws-samples/sample-OpenClaw-on-AWS-with-Bedrock)
+- [Amazon Bedrock — OpenClaw 공식 문서](https://docs.openclaw.ai/providers/bedrock)
+- [DEV Community — $1k에서 $20/월로 절감 사례](https://dev.to/aws-builders/i-squeezed-my-1k-monthly-openclaw-api-bill-with-20month-in-aws-credits-heres-the-exact-setup-3gj4)
+
+---
+
+### 9.3 KimiClaw — Cloudflare 서버리스 + Moonshot AI 공식
+
+KimiClaw는 **두 개의 서로 다른 프로젝트**가 같은 이름을 사용합니다.
+
+#### A. 커뮤니티 포크 (claudedjale/KimiClaw)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [claudedjale/KimiClaw](https://github.com/claudedjale/KimiClaw) |
+| **Stars/Forks** | 1 star / **1,600 forks** |
+| **언어** | TypeScript |
+| **인프라** | Cloudflare Workers (서버리스 엣지) |
+| **비용** | ~$5/월 (Cloudflare Workers 플랜) |
+| **라이선스** | MIT |
+
+Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화. **서버가 아예 없는** 유일한 OpenClaw 변종입니다.
+
+| 특징 | 내용 |
+|------|------|
+| 배포 | Cloudflare Workers, ~5분 설정, 300+ 글로벌 엣지 |
+| 채널 | Telegram, Discord, Slack, WhatsApp Business, 웹 UI |
+| 저장 | Cloudflare R2 (암호화 저장) |
+| 브라우저 | Cloudflare Browser Rendering (CDP 기반) |
+| 모델 | Kimi K2.5 (기본) + DeepSeek, Claude, GPT, OpenAI 호환 API |
+| 보안 | 게이트웨이 토큰 + Cloudflare Access SSO + 디바이스 페어링 + R2 암호화 |
+
+1 star vs 1,600 forks의 극단적 비율은 — 사람들이 조용히 포크해서 자기 인스턴스를 배포하고 있다는 의미입니다.
+
+#### B. 공식 제품 (Moonshot AI)
+
+| 항목 | 내용 |
+|------|------|
+| **사이트** | [kimi-claw.com](https://kimi-claw.com/) |
+| **만든 곳** | Moonshot AI (베이징, 싱가포르 법인, 알리바바 클라우드) |
+| **출시** | 2026.2.15 |
+| **모델** | Kimi K2.5 Thinking |
+
+| 특징 | 내용 |
+|------|------|
+| 설정 | 원클릭, 1분, 터미널 불필요 |
+| 스킬 | 5,000+ ClawHub 커뮤니티 스킬 (셀프 호스팅 대비 7배) |
+| 스토리지 | 40GB 클라우드 |
+| 검색 | 프로급 검색 — Yahoo Finance, 뉴스, 기술 문서 실시간 데이터 |
+| 스케줄링 | 자동 예약 작업 |
+| 가격 | Allegretto 멤버십 이상 필요 |
+| 기존 연결 | "Bring Your Own Claw" — 기존 로컬 OpenClaw 인스턴스를 kimi.com에 브릿지 가능 |
+
+#### 데이터 주권 경고
+
+공식 Kimi Claw는 데이터가 **Moonshot AI 서버(알리바바 클라우드)**에 저장됩니다. Hacker News 커뮤니티에서 "CCP 가시성을 전제하라"는 경고가 나왔습니다. 민감한 데이터를 다루는 경우 주의가 필요합니다.
+
+#### 참고 링크
+
+- [GitHub — claudedjale/KimiClaw](https://github.com/claudedjale/KimiClaw)
+- [Kimi Claw 공식 소개](https://www.kimi.com/resources/kimi-claw-introduction)
+- [MarkTechPost — Moonshot AI Launches Kimi Claw](https://www.marktechpost.com/2026/02/15/moonshot-ai-launches-kimi-claw-native-openclaw-on-kimi-com-with-5000-community-skills-and-40gb-cloud-storage-now/)
+- [Hacker News 토론](https://news.ycombinator.com/item?id=47023633)
+- [Cloudflare — Introducing Moltworker](https://blog.cloudflare.com/moltworker-self-hosted-ai-agent/)
+
+---
+
+### 클라우드 배포 방식 비교표
+
+| | serverless-openclaw | AWS Bedrock 버전 | KimiClaw (포크) | KimiClaw (공식) |
+|---|---|---|---|---|
+| **인프라** | AWS (Lambda+Fargate) | AWS (EC2+Bedrock) | Cloudflare Workers | Moonshot AI 클라우드 |
+| **월 비용** | ~$1 | ~$46 | ~$5 | 멤버십 |
+| **서버 관리** | 없음 | EC2 관리 필요 | 없음 | 없음 |
+| **모델** | OpenClaw 기본 | Bedrock 전체 (Nova, DeepSeek, Llama, Claude) | Kimi + 멀티모델 | Kimi K2.5 |
+| **인증** | Cognito JWT | IAM 역할 | CF Access + 토큰 | Moonshot 계정 |
+| **데이터 주권** | AWS 리전 선택 | AWS 리전 선택 | Cloudflare 글로벌 | **중국 기업 서버** |
+| **OpenClaw 앱 보안** | 미해결 | 미해결 | 미해결 | 미해결 |
+
+> **공통 한계**: 4가지 모두 인프라 레벨의 개선이며, OpenClaw 자체의 앱 레벨 취약점(CVE, 프롬프트 인젝션, 악성 스킬)은 해결하지 못합니다. 근본적 보안이 필요하면 IronClaw나 NanoClaw처럼 아키텍처 자체가 다른 도구를 선택해야 합니다.
 
 ---
 
