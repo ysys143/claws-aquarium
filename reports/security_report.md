@@ -1,7 +1,7 @@
-# 실세계 권한 부여 보안 전략 — 8개 Claw 코드 기반 비교 분석
+# 실세계 권한 부여 보안 전략 — 7개 Claw 코드 기반 비교 분석
 
 > **조사 일자**: 2026-03-05
-> **조사 방법**: 8개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석
+> **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석
 > **핵심 질문**: "에이전트에게 실세계 권한을 안전하게 부여하기 위해 각 프레임워크가 어떤 보안 전략을 채택했는가?"
 
 ---
@@ -19,19 +19,19 @@
 
 ## 1. Executive Summary
 
-8개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
+7개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
 
 | 계층 | 구현체 | 특징 |
 |------|--------|------|
 | **Tier 1: Defense-in-Depth** | IronClaw, ZeroClaw | 암호화 볼트 + WASM/Docker 이중 샌드박스 + 다층 인젝션 방어 + HITL 승인 + 비용 제한 |
 | **Tier 2: Container-First** | NanoClaw, OpenClaw | Docker 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어 |
 | **Tier 3: Denylist-Based** | Nanobot, PicoClaw | 정규식 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음 |
-| **Tier 4: Minimal/None** | TinyClaw, Moltbook | 보안 메커니즘 최소 또는 해당 없음 (실험적/특수 용도) |
+| **Tier 4: Minimal/None** | TinyClaw | 보안 메커니즘 최소 또는 해당 없음 (실험적 용도) |
 
 **가장 주목할 발견 3가지:**
 
-1. **암호화 볼트를 구현한 곳은 IronClaw과 ZeroClaw 뿐이다.** 나머지 6개는 전부 평문 또는 해시 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305.
-2. **Human-in-the-loop를 구현한 곳은 3개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop), Moltbook(Twitter OAuth 클레임). 나머지 5개는 에이전트가 도구를 자율 실행.
+1. **암호화 볼트를 구현한 곳은 IronClaw과 ZeroClaw 뿐이다.** 나머지 5개는 전부 평문 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305.
+2. **Human-in-the-loop를 구현한 곳은 2개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop). 나머지 5개는 에이전트가 도구를 자율 실행.
 3. **프롬프트 인젝션 방어에 전용 레이어를 둔 곳은 IronClaw과 ZeroClaw 뿐이다.** IronClaw는 SafetyLayer 4중 방어, ZeroClaw는 PromptGuard 6패턴 탐지. 나머지는 레이블링(Nanobot) 또는 마커 래핑(OpenClaw) 수준.
 
 ---
@@ -49,7 +49,6 @@
 | **ZeroClaw** | 3단계 AutonomyLevel (ReadOnly/Supervised/Full) + 명령어 위험도 분류 | O (High/Medium/Low 분류) | `src/security/policy.rs:10-18` |
 | **PicoClaw** | AllowFrom + 서브에이전트 spawn 허용목록 + 에이전트 바인딩 | △ (spawn만 제어) | `pkg/tools/spawn.go:78-82` |
 | **TinyClaw** | Pairing 시스템만 | X | `src/lib/pairing.ts:73-81` |
-| **Moltbook** | Bearer API 키 + 소유권 기반 CRUD 제어 | N/A (REST API) | `src/middleware/auth.js:13-58` |
 
 ### 2.2 자격증명 관리
 
@@ -62,7 +61,6 @@
 | **ZeroClaw** | ChaCha20-Poly1305 AEAD | **O** | X (파일 기반 .secret_key) | 로그 자동 redact | `src/security/secrets.rs:1-22` |
 | **PicoClaw** | `auth.json` (평문, 0600) | X | X | env 태그 지원 | `pkg/auth/store.go:41-44` |
 | **TinyClaw** | `settings.json` (평문) | X | X | X (API로 노출) | `lib/setup-wizard.sh:364-386` |
-| **Moltbook** | SHA-256 해시 (DB) | **해시** | N/A | 프로덕션 필수 검증 | `src/utils/auth.js:97-99` |
 
 ### 2.3 샌드박싱
 
@@ -75,7 +73,6 @@
 | **ZeroClaw** | O | **O** (wasmi, 10억fuel) | Landlock/Firejail/Bubblewrap | workspace_only 기본 활성 | `src/security/detect.rs:8-71`, `src/runtime/wasm.rs:1-80` |
 | **PicoClaw** | △ (기본 격리만) | X | `os.Root` 기반 샌드박스 | restrictToWorkspace 기본 활성 | `pkg/tools/filesystem.go:281-390` |
 | **TinyClaw** | X | X | X | 디렉터리만 분리 | `--dangerously-skip-permissions` 항상 사용 |
-| **Moltbook** | N/A | N/A | N/A | N/A | REST API만 제공 |
 
 ### 2.4 도구 실행 안전성
 
@@ -88,7 +85,6 @@
 | **ZeroClaw** | **5중 방어**(서브쉘/리다이렉션/tee/백그라운드/화이트리스트) | WASM 호스트 화이트리스트 | null바이트/URL인코딩/~user 차단 | — | `src/security/policy.rs:726-816` |
 | **PicoClaw** | **77개 정규식** denylist + 커스텀 패턴 | — | `filepath.IsLocal()` + 심링크 추적 | 10,000자 | `pkg/tools/shell.go:29-77` |
 | **TinyClaw** | X (제한 없음) | X | X | — | `--dangerously-skip-permissions` |
-| **Moltbook** | N/A | N/A | N/A | 1MB 요청 크기 | `src/app.js:40` |
 
 ### 2.5 Human-in-the-Loop
 
@@ -101,7 +97,6 @@
 | **ZeroClaw** | **O** (Supervised 모드 + Yes/No/Always) | 중/고위험 명령 | **E-Stop** (4단계 + OTP) | `src/approval/mod.rs:156-185`, `src/security/estop.rs` |
 | **PicoClaw** | X (자율 실행) | — | — | `pkg/tools/toolloop.go:134-158` |
 | **TinyClaw** | △ (Pairing만, 도구 승인 없음) | 채널 접근만 | — | `src/lib/pairing.ts:73-81` |
-| **Moltbook** | **O** (Twitter OAuth 클레임) | 에이전트 소유권 | — | `src/services/AgentService.js:189-207` |
 
 ### 2.6 비용/속도 제한
 
@@ -114,7 +109,6 @@
 | **ZeroClaw** | 시간당 20회 쓰기/실행 | **일별 $5 하드 한도** | — | `src/cost/tracker.rs:50-100` |
 | **PicoClaw** | 제공자 지수 백오프 쿨다운 | X | RPM 설정, max_tokens=32768 | `pkg/providers/cooldown.go:183-207` |
 | **TinyClaw** | X | X | 대화당 50메시지, 재시도 5회, TTL 30분 | `src/lib/conversation.ts:12` |
-| **Moltbook** | **전역 100/분 + 포스트 1/30분 + 댓글 50/시간** | N/A | 요청 1MB | `src/config/index.js:28-32` |
 
 ### 2.7 프롬프트 인젝션 방어
 
@@ -127,7 +121,6 @@
 | **ZeroClaw** | **O** (PromptGuard 6패턴) | 시스템 오버라이드/역할혼란/JSON인젝션/시크릿추출/커맨드인젝션/탈옥 탐지 | `src/security/prompt_guard.rs` |
 | **PicoClaw** | X | 없음 (셸 denylist이 간접 방어) | — |
 | **TinyClaw** | X | 없음 (`[@teammate:]` 태그 파싱이 인젝션 벡터) | `src/lib/routing.ts:66` |
-| **Moltbook** | N/A | Helmet.js HTTP 헤더만 | `src/app.js:18` |
 
 ---
 
@@ -182,13 +175,6 @@
 - **약점(전면적)**: 인증 없는 REST API, CORS 와일드카드, 평문 자격증명 API 노출, `--dangerously-skip-permissions` 항상 사용, 프롬프트 인젝션 방어 없음, `[@teammate:]` 태그 파싱이 인젝션 벡터
 - **유일한 강점**: Pairing 코드 `crypto.randomBytes` 생성
 
-### 3.8 Moltbook — "REST API 특수 사례"
-
-**보안 철학**: 에이전트 프레임워크가 아닌 에이전트용 소셜 API. 전통적 웹 보안 적용.
-
-- **강점**: API 키 SHA-256 해시 저장(평문 불저장), 파라미터화 SQL, 계층적 Rate Limiting, Twitter OAuth 클레임
-- **약점**: JWT_SECRET 하드코딩 기본값, RBAC 미구현, 인메모리 Rate Limiting
-
 ---
 
 ## 4. 핵심 보안 패턴 5가지
@@ -204,8 +190,6 @@ stdin 전달+즉시 삭제 (NanoClaw)
   ↓ 메모리에만 존재, 디스크/로그/환경변수 노출 방지
 환경변수 차단 (OpenClaw)
   ↓ 20+ 패턴 자동 제거, 기본 저장은 평문
-해시 저장 (Moltbook)
-  ↓ 복호화 불가하지만 검증은 가능
 평문 저장 (Nanobot, PicoClaw, TinyClaw)
   ↓ OS 파일 권한에만 의존
 ```
@@ -234,7 +218,6 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
     PicoClaw ─────── os.Root 파일시스템 + Docker (기본)
     Nanobot ──────── Docker (root 실행!)
     TinyClaw ─────── 디렉터리 분리만
-    Moltbook ─────── N/A (REST API)
                          ↓
                     격리 수준 낮음
 ```
@@ -245,7 +228,7 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
 |------|--------|------|
 | **세밀한 도구별 승인** | IronClaw, ZeroClaw | 위험도별 승인/자동허용/항상승인 |
 | **실행 승인 요청** | OpenClaw | 채널(Discord 등)로 승인 요청 발송 |
-| **진입점 제어만** | TinyClaw (Pairing), Moltbook (Claim) | 접근 자체만 제한, 내부 실행은 자율 |
+| **진입점 제어만** | TinyClaw (Pairing) | 접근 자체만 제한, 내부 실행은 자율 |
 | **없음** | Nanobot, NanoClaw, PicoClaw | 완전 자율 실행 |
 
 **가장 정교한 HITL**: ZeroClaw의 E-Stop 시스템. `KillAll` / `NetworkKill` / `DomainBlock` / `ToolFreeze` 4단계 긴급 정지 + OTP 없이 해제 불가.

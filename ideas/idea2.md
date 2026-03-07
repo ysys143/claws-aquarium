@@ -30,7 +30,7 @@ TeamCreate tool을 이용해 Agent Team을 구성해.
 반드시 각 에이전트마다 별도의 하나 이상의 에이전트를 배정해서 병렬로 빠르고 깊이 있게 조사해야해.
 
 [조사 결과]
-8개 구현체(OpenClaw, Nanobot, NanoClaw, IronClaw, ZeroClaw, PicoClaw, TinyClaw, Moltbook)의 소스코드를 병렬 분석했다. 상세 분석은 session_context_report.md 참조.
+7개 구현체(OpenClaw, Nanobot, NanoClaw, IronClaw, ZeroClaw, PicoClaw, TinyClaw)의 소스코드를 병렬 분석했다. 상세 분석은 session_context_report.md 참조.
 
 핵심 발견 3가지:
 
@@ -38,7 +38,6 @@ TeamCreate tool을 이용해 Agent Team을 구성해.
    - 프로세스/컨테이너 격리: NanoClaw, TinyClaw (실제 별도 프로세스나 컨테이너)
    - 세션 키 기반 논리적 격리: OpenClaw, Nanobot, PicoClaw, ZeroClaw (같은 프로세스 안에서 ID로 분리)
    - 보안 계층 기반 격리: IronClaw
-   - Moltbook: 세션 개념 자체 없음. 단발성 실행에 특화된 특수 사례.
 
 2. **전부 기본적으로 단일 세션 단일 스레드**
    서브에이전트 스폰 기능을 가진 구현체(OpenClaw, Nanobot, NanoClaw, TinyClaw, IronClaw)가 있긴 하지만, "이 작업은 별도 컨텍스트로 분리해야 한다"는 판단을 프레임워크 레벨에서 자동으로 내리는 곳은 없다. 전부 LLM의 도구 호출 판단에 맡긴다.
@@ -69,17 +68,17 @@ Karpathy가 트윗에서 공개한 셋업: 에이전트 8개(Claude 4개 + Codex
 
 **논의 4: 대시보드와 모니터링**
 
-8개 중 TinyClaw만 대시보드를 가지고 있다(TUI + TinyOffice 웹 UI). Karpathy는 tmux 자체가 대시보드이자 takeover 인터페이스다. 나머지는 전부 메신저나 CLI로만 결과를 확인한다. 24시간 돌아가는 에이전트에서 뭔가 잘못될 때 어떻게 개입할 것인가의 문제는 아직 대부분의 구현체에서 풀리지 않았다.
+7개 중 TinyClaw만 대시보드를 가지고 있다(TUI + TinyOffice 웹 UI). Karpathy는 tmux 자체가 대시보드이자 takeover 인터페이스다. 나머지는 전부 메신저나 CLI로만 결과를 확인한다. 24시간 돌아가는 에이전트에서 뭔가 잘못될 때 어떻게 개입할 것인가의 문제는 아직 대부분의 구현체에서 풀리지 않았다.
 
 **논의 5: 실세계 권한 부여 — 보안 전략 코드 기반 조사 결과** (2026-03-05, 상세 분석: security_report.md)
 
-8개 구현체의 보안/권한 코드를 병렬 분석한 결과, 4단계 보안 성숙도 계층이 드러났다:
+7개 구현체의 보안/권한 코드를 병렬 분석한 결과, 4단계 보안 성숙도 계층이 드러났다:
 - **Tier 1 (Defense-in-Depth)**: IronClaw(AES-256-GCM 볼트+WASM+SafetyLayer 4중방어), ZeroClaw(ChaCha20-Poly1305+E-Stop+PromptGuard)
 - **Tier 2 (Container-First)**: NanoClaw(stdin 시크릿+mount-security), OpenClaw(도구 deny/allow+환경변수 위생)
 - **Tier 3 (Denylist-Based)**: Nanobot(정규식 차단), PicoClaw(77개 패턴+os.Root 샌드박스)
-- **Tier 4 (Minimal)**: TinyClaw(`--dangerously-skip-permissions` 항상 사용), Moltbook(REST API 특수사례)
+- **Tier 4 (Minimal)**: TinyClaw(`--dangerously-skip-permissions` 항상 사용)
 
-핵심 발견: 암호화 볼트(2/8), HITL 도구 승인(3/8), 프롬프트 인젝션 전용 방어(2/8)를 구현한 곳이 소수. "에이전트에게 실세계 권한을 안전하게 주는 문제"는 IronClaw/ZeroClaw도 "사전 정의된 도구 목록"에 대한 보안이지 "임의의 실세계 액션"에 대한 보안이 아니다. 논의 1의 "빠진 기능이 아니라 안 넣은 기능" 테제는 부분적으로만 맞다 — IronClaw의 Zero-Exposure 프록시나 ZeroClaw의 E-Stop+OTP는 시스템 프롬프트 추가로 해결할 수 없는 아키텍처 수준 설계.
+핵심 발견: 암호화 볼트(2/7), HITL 도구 승인(3/7), 프롬프트 인젝션 전용 방어(2/7)를 구현한 곳이 소수. "에이전트에게 실세계 권한을 안전하게 주는 문제"는 IronClaw/ZeroClaw도 "사전 정의된 도구 목록"에 대한 보안이지 "임의의 실세계 액션"에 대한 보안이 아니다. 논의 1의 "빠진 기능이 아니라 안 넣은 기능" 테제는 부분적으로만 맞다 — IronClaw의 Zero-Exposure 프록시나 ZeroClaw의 E-Stop+OTP는 시스템 프롬프트 추가로 해결할 수 없는 아키텍처 수준 설계.
 
 [열린 질문]
 
@@ -103,27 +102,27 @@ Karpathy가 트윗에서 공개한 셋업: 에이전트 8개(Claude 4개 + Codex
 
 **논의 6: 브라우저 자동화와 액션/도구 아키텍처** (2026-03-05, 상세 분석: browser_actions_report.md)
 
-8개 구현체의 브라우저+도구 코드를 병렬 분석한 결과:
+7개 구현체의 브라우저+도구 코드를 병렬 분석한 결과:
 
-- **브라우저 자동화 4개만 보유**: OpenClaw(50+ 기능 풀스택), ZeroClaw(3 백엔드 교체 가능), NanoClaw(호스트 실행 안티탐지), IronClaw(테스트 전용). 나머지 4개는 없음.
+- **브라우저 자동화 4개만 보유**: OpenClaw(50+ 기능 풀스택), ZeroClaw(3 백엔드 교체 가능), NanoClaw(호스트 실행 안티탐지), IronClaw(테스트 전용). 나머지 3개는 없음.
 - **도구 정의 3철학**: 타입 기반(Rust/Go trait), 스키마 기반(JSON Schema), 문서 기반(SKILL.md). 보안과 확장성이 반비례.
-- **MCP가 사실상 표준**: 5/8이 MCP 래핑 패턴을 독립적으로 구현. 외부 도구 통합의 공통 프로토콜.
-- **PicoClaw만 도구 병렬 실행 지원** (goroutine + WaitGroup). 나머지 7개는 전부 순차 실행.
+- **MCP가 사실상 표준**: 5/7이 MCP 래핑 패턴을 독립적으로 구현. 외부 도구 통합의 공통 프로토콜.
+- **PicoClaw만 도구 병렬 실행 지원** (goroutine + WaitGroup). 나머지 6개는 전부 순차 실행.
 - **IronClaw의 Zero-Exposure 크레덴셜 모델이 유일하게 도구 코드 버그에도 시크릿 안전**. 프록시 레이어에서 URL 패턴 매칭 -> 헤더 주입. WASM 도구는 secret-exists()만 호출 가능.
 - **NanoClaw의 호스트 실행 브라우저가 독창적**: X가 자동화를 탐지/차단하므로 컨테이너가 아닌 호스트에서 실제 Chrome을 실행. IPC 파일 폴링으로 컨테이너 에이전트와 통신.
 
 열린 질문 5번(동적 도구 위험도 평가)에 대해: IronClaw의 ApprovalRequirement가 가장 근접하지만 수동 설정. MCP 도구 자동 분류는 아직 없음. 열린 질문 8번(E-Stop 메신저 통합)에 대해: NanoClaw의 IPC 워처에 E-Stop 로직을 삽입하면 "텔레그램 /estop -> 모든 pending 작업 거부"가 아키텍처적으로 가능.
 
-9. **도구 병렬 실행의 부재**: PicoClaw 외 7개가 순차 실행. 복잡한 멀티스텝 작업(메일 읽기+일정 확인+계획 수립)에서 도구 병렬 실행이 없으면 레이턴시가 선형 누적. 이걸 프레임워크 레벨에서 풀어야 하는가?
+9. **도구 병렬 실행의 부재**: PicoClaw 외 6개가 순차 실행. 복잡한 멀티스텝 작업(메일 읽기+일정 확인+계획 수립)에서 도구 병렬 실행이 없으면 레이턴시가 선형 누적. 이걸 프레임워크 레벨에서 풀어야 하는가?
 
 10. **브라우저 보안과 기능의 트레이드오프**: OpenClaw(50+ 기능, SSRF 방어) vs NanoClaw(6개 X 액션, 안티탐지). "만능 브라우저 도구"와 "특화된 플랫폼 자동화" 중 24시간 에이전트에 더 적합한 것은?
 
 **논의 7: 기억 아키텍처 -- 중기/장기 기억의 설계 선택** (2026-03-05, 상세 분석: memory_architecture_report.md)
 
-8개 구현체의 기억 시스템 코드를 병렬 분석한 결과, 3단계 기억 성숙도가 드러났다:
+7개 구현체의 기억 시스템 코드를 병렬 분석한 결과, 3단계 기억 성숙도가 드러났다:
 - **Tier 1 (Full Memory Stack)**: IronClaw(pgvector+RRF), OpenClaw(sqlite-vec+LanceDB+Weighted+Decay+MMR), ZeroClaw(SQLite+FTS5+linear fusion+Soul Snapshot)
 - **Tier 2 (Structured Markdown)**: Nanobot(MEMORY.md+HISTORY.md, LLM consolidation), PicoClaw(MEMORY.md+3일 daily notes, mtime 캐시)
-- **Tier 3 (Delegation/None)**: NanoClaw(CLAUDE.md 위임), TinyClaw(write-only 아카이브), Moltbook(없음)
+- **Tier 3 (Delegation/None)**: NanoClaw(CLAUDE.md 위임), TinyClaw(write-only 아카이브)
 
 핵심 발견: "이중 주입 경로"(MEMORY.md 항상 로드 + DB 검색 동적 주입)가 Tier 1 공통 패턴. ZeroClaw의 Soul Snapshot(brain.db -> MEMORY_SNAPSHOT.md -> Git -> cold-boot 복원)이 유일한 자아 연속성 구현. 기억 보호 메커니즘이 보안 성숙도와 상관관계(security_report.md Tier 1 = memory Tier 1). 최적 조합 제안: ZeroClaw의 Soul Snapshot + OpenClaw의 하이브리드 검색 + IronClaw의 정체성 보호.
 

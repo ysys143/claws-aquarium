@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1772879732798,
+  "projectRoot": "/Users/jaesolshin/Documents/GitHub/compare_claws",
+  "techStack": {
+    "languages": [],
+    "frameworks": [],
+    "packageManager": null,
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": null,
+    "testCommand": null,
+    "lintCommand": null,
+    "devCommand": null,
+    "scripts": {}
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [],
+    "gitBranches": null
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "ideas": {
+      "path": "ideas",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1772879732790,
+      "keyFiles": [
+        "idea1.md",
+        "idea2.md",
+        "idea3.md",
+        "idea4.md"
+      ]
+    },
+    "reports": {
+      "path": "reports",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1772879732791,
+      "keyFiles": [
+        "browser_actions_report.md",
+        "memory_architecture_report.md",
+        "openclaw_ecosystem_report.md",
+        "security_report.md",
+        "session_context_report.md"
+      ]
+    },
+    "repos": {
+      "path": "repos",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1772879732792,
+      "keyFiles": []
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

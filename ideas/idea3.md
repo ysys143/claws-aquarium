@@ -142,6 +142,7 @@ idea2.md의 4개 분석 보고서에서 직접 활용 가능한 설계 패턴:
 - sqlite-vec 또는 LanceDB (OpenClaw 패턴)
 - BM25 (SQLite FTS5)
 - 하이브리드 검색 (Claw Tier 1에서 입증된 패턴)
+- **Bayesian BM25** (cognica-io/bayesian-bm25) -- 아래 "하이브리드 검색 개선" 참조
 
 ### 에이전트 런타임
 - Claude Code SDK (subagent, skill, MCP)
@@ -189,6 +190,71 @@ idea2.md의 4개 분석 보고서에서 직접 활용 가능한 설계 패턴:
 
 ### 키워드
 llm, bm25, embedding, rag, agent, ReAct, tool, mcp, graph, claude code, plan, todos, tasks, subagent, skill, deepagent, AI scientist, CC Workflow Studio, research agent MARS, InternRL, CoSyne
+
+
+## Bayesian BM25: Claw 하이브리드 검색의 업그레이드 경로
+
+### 문제: Claw들의 하이브리드 검색이 가진 공통적 약점
+
+memory_architecture_report.md에서 발견한 3가지 하이브리드 검색 구현:
+
+| Claw | 방식 | 근본적 한계 |
+|------|------|------------|
+| IronClaw | RRF (k=60) | 점수 크기 정보 손실. 순위 기반이라 확률 해석 불가 |
+| OpenClaw | Weighted merge + temporal decay + MMR | 가중치가 휴리스틱. BM25와 vector 점수 스케일이 다른데 단순 합산 |
+| ZeroClaw | Linear fusion (0.7v + 0.3k) | 고정 가중치. 쿼리 특성에 따른 적응 없음 |
+
+공통 문제: **BM25 점수는 unbounded (0~무한대)인데, vector 유사도는 [0,1]. 스케일이 다른 점수를 어떻게 합치는가?**
+
+기존 해법들은 전부 ad-hoc:
+- RRF: 순위만 보고 점수 버림
+- Min-max 정규화: 배치 의존적, 새 문서 추가 시 깨짐
+- 고정 가중치: 쿼리마다 최적 가중치가 다름
+
+### 해답: Bayesian BM25 (cognica-io/bayesian-bm25)
+
+BM25 점수를 sigmoid 함수로 [0,1] 확률로 변환. 이론적 근거:
+1. 관련성은 이진(관련/비관련) = 베르누이 분포
+2. 베르누이 분포는 지수족
+3. 지수족의 정준 연결 함수의 역 = sigmoid
+
+결과: BM25 점수가 "이 문서가 관련될 확률 73%"처럼 해석 가능해짐.
+
+### 적용 시 기대 효과
+
+| 항목 | Before (현재 Claw 방식) | After (Bayesian BM25) |
+|------|------------------------|----------------------|
+| 점수 해석 | "12.34점이 높은 건가?" | "관련 확률 73%" |
+| 하이브리드 결합 | 휴리스틱 가중 합산 | 확률 곱셈 (P_text x P_vector) |
+| 보정 정확도 | 기준 없음 | 68~77% 보정 오류 감소 |
+| 검색 성능 | 전체 스캔 필요 | WAND 프루닝으로 77~88% 문서 건너뛰기 |
+| 다중 신호 융합 | AND/OR 로직 없음 | 확률적 AND/OR/NOT 연산 지원 |
+
+### 적용 난이도
+
+```
+pip install bayesian-bm25
+```
+
+| 단계 | 난이도 | 작업 내용 |
+|------|--------|----------|
+| 1. 독립 실험 | 하 | pip install 후 기존 코퍼스로 BM25 점수 변환 테스트 |
+| 2. 검색 파이프라인 통합 | 중 | SQLite FTS5 BM25 출력 -> Bayesian BM25 변환 -> vector 점수와 확률 결합 |
+| 3. Claw 프레임워크 패치 | 중~상 | OpenClaw/ZeroClaw의 하이브리드 검색 모듈에 직접 적용 (Rust/TS 바인딩 필요) |
+| 4. 파라미터 학습 | 중 | 랩 논문 코퍼스로 사전 확률(base rate) 학습. 레이블 불필요 (비지도) |
+
+Python 라이브러리이므로:
+- **OpenClaw (TS)** 에 적용: Python subprocess 또는 WASM 포팅 필요. 난이도 중상.
+- **Memory MCP Server** 에 적용: MCP 서버를 Python으로 구현하면 직접 import. **난이도 하~중. 가장 현실적.**
+- **독립 RAG 파이프라인** 에 적용: LangChain/LlamaIndex와 조합. 난이도 하.
+
+### 참고 자료
+
+- https://github.com/cognica-io/bayesian-bm25 -- 레퍼런스 구현 (Python, pip)
+- https://www.cognica.io/ko/blog/posts/2026-02-01-bayesian-bm25-hybrid-search -- 하이브리드 검색에서의 역할
+- https://www.cognica.io/ko/blog/posts/2026-02-23-why-sigmoid -- sigmoid가 유일한 해답인 수학적 증명
+- MTEB 벤치마크 baseline으로 채택됨
+- txtai 하이브리드 검색에 통합됨
 
 
 ## 열린 질문
