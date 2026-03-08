@@ -2,7 +2,8 @@
 
 > **조사 일자**: 2026-03-08
 > **조사 방법**: 소스코드 심층 분석 (`config.ex`, `app_server.ex`, `tracker.ex`, `SPEC.md`)
-> **핵심 질문**: "Symphony는 Codex에 종속적인가? Claw 프레임워크와 통합 가능한가?"
+> **핵심 질문**: "Symphony 스펙은 에이전트 런타임 중립인가? Claw 프레임워크로 스펙을 구현할 수 있는가?"
+> **수정 노트**: 초기 분석이 Elixir 참조 구현체의 Codex 결합을 Symphony 스펙 자체의 종속성으로 오해석함. 이 보고서는 그 구분을 명확히 함.
 > **선행 보고서**: `symphony_report.md` (Symphony 원본 분석)
 
 ---
@@ -10,7 +11,7 @@
 ## 목차
 
 1. [Executive Summary](#1-executive-summary)
-2. [Codex 종속성 분석](#2-codex-종속성-분석)
+2. [Elixir 참조 구현체의 Codex 구현 선택](#2-elixir-참조-구현체의-codex-구현-선택)
 3. [Tracker 어댑터 중립성](#3-tracker-어댑터-중립성)
 4. [Claw 통합 5가지 전략](#4-claw-통합-5가지-전략)
 5. [ClawPort 연동 시나리오](#5-clawport-연동-시나리오)
@@ -21,29 +22,31 @@
 
 ## 1. Executive Summary
 
-Symphony의 Codex 종속성 수준은 **8.5/10** — AppServer 레이어가 Codex JSON-RPC 방언에 강하게 결합되어 있다. 반면 Tracker는 **중립적** — behaviour 기반 어댑터 설계로 Linear 외 다른 시스템으로의 교체 비용이 낮다 (2-3주).
+Symphony는 **언어-에이전트 중립 오픈 스펙**(`SPEC.md`)이다. OpenAI의 Elixir 구현체(`elixir/`)는 Codex를 에이전트 백엔드로 선택한 **참조 구현** 중 하나일 뿐이며, 다른 조직은 동일한 스펙을 자신의 에이전트 런타임으로 구현할 수 있다.
 
 **핵심 발견 5가지:**
 
-1. **AppServer 프로토콜이 Codex 전용 드라이버로 하드코딩됨** — `app_server.ex`의 `initialize`, `thread/start`, `turn/start` 메서드가 Codex JSON-RPC 방언에 직접 결합됨. 다른 에이전트 바이너리로 교체하려면 약 600 LOC 전체 재작성 필요.
+1. **Symphony 스펙은 에이전트 런타임 중립** — `SPEC.md:29`: "a scheduler/runner and tracker reader". 어떤 에이전트를 사용할지 스펙이 강제하지 않는다. Codex는 OpenAI 참조 구현체의 선택.
 
-2. **기본 명령어가 `"codex app-server"`로 고정** — `config.ex:31`의 `@default_codex_command`. 환경변수나 WORKFLOW.md 설정으로도 근본적 프로토콜 변경은 불가 (stderr/stdout 직렬화 형식이 Codex 고정).
+2. **Elixir 참조 구현체는 Codex에 특화** — `app_server.ex`가 Codex JSON-RPC 방언을 직접 구현. 이는 참조 구현의 설계 결정이며, 스펙의 요구사항이 아니다.
 
-3. **Tracker 어댑터는 5개 콜백만 구현하면 교체 가능** — `tracker.ex:8-12`의 behaviour 설계로 GitHub Issues, Jira, Plane 등으로 2-3주 안에 전환 가능. 이미 `Tracker.Memory` 테스트 어댑터 존재.
+3. **Tracker 어댑터는 스펙에서도 교체 가능하도록 명시 설계** — `tracker.ex:8-12`의 5개 콜백 behaviour. `SPEC.md:2103`이 "pluggable tracker adapters" 확장을 공식 계획으로 언급.
 
-4. **Claw 통합 전략은 기술적으로 가능하나 AppServer 브릿지 필요** — 전략 A (Nanobot 래퍼, 6주), 전략 C (공동 오케스트레이션, 8-10주) 등 5가지 경로 검토. 권장 1단계는 전략 C (최소 Symphony 수정).
+4. **전략 D(Native app-server 구현)가 스펙이 의도한 정석 경로** — `SPEC.md:133`이 암시하는 방향. Claw 프레임워크가 app-server 프로토콜을 구현하면 Symphony 스케줄러를 수정 없이 사용 가능.
 
-5. **ClawPort를 Symphony Tracker 어댑터로 확장 가능** — Symphony가 Linear 대신 ClawPort API를 폴링하면, 에이전트 스케줄링 + 관찰 + 비용 추적이 단일 제어 평면에서 가능.
+5. **전략 C(공동 오케스트레이션)는 전략 D 이전의 현실적 단기 경로** — 스펙 준수 없이 HTTP 브릿지로 빠르게 결합. 8-10주, 1.5K LOC.
 
 ---
 
-## 2. Codex 종속성 분석
+## 2. Elixir 참조 구현체의 Codex 구현 선택
 
-### 2.1 두 층의 결합
+> **중요**: 이 섹션은 Symphony **스펙**의 종속성이 아니라, OpenAI의 **Elixir 참조 구현체**가 Codex를 선택한 구체적 방식을 분석한다. 다른 조직이 스펙을 구현할 때는 이 설계 결정을 따를 필요 없다.
 
-**층 1 — AppServer 프로토콜 하드코딩 (높은 비용)**
+### 2.1 참조 구현체의 두 층 결합
 
-`app_server.ex`의 핵심 메서드 호출이 Codex 전용 JSON-RPC 방언에 직접 하드코딩됨:
+**층 1 — AppServer 프로토콜 (Codex 특화 구현)**
+
+Elixir 참조 구현체의 `app_server.ex`가 Codex JSON-RPC 방언을 직접 구현:
 
 | 메서드 | 파일:라인 | 역할 | 교체 가능성 |
 |--------|---------|------|----------|
@@ -76,9 +79,9 @@ args: [~c"-lc", String.to_charlist(Config.codex_command())],
 
 Bash로 `codex app-server` 서브프로세스를 스폰하고, stdin/stdout으로 JSON-RPC 통신. 다른 에이전트(Nanobot, OpenClaw)로 교체하려면 **이 프로토콜 전체를 재구현**해야 한다.
 
-**결론**: AppServer는 **Codex 전용 드라이버**. 추상화 레이어 없음.
+**결론**: Elixir 참조 구현체의 AppServer는 **Codex 전용 드라이버**. 그러나 이는 스펙 요구사항이 아닌 OpenAI의 구현 선택이다. 다른 조직의 구현에서는 다른 에이전트 드라이버로 대체 가능.
 
-### 2.2 AgentRunner 간접 결합 (중간 비용)
+### 2.2 AgentRunner 간접 결합 (참조 구현 한정)
 
 `agent_runner.ex:11-33`:
 
@@ -288,7 +291,7 @@ end
 
 **현실성:** 높음 (최소 침습, 상호 독립적)
 
-### 4.4 전략 D: Native app-server 모드 (20주, 프레임워크당 2.5K LOC)
+### 4.4 전략 D: Native app-server 모드 ← **스펙이 의도한 정석 경로** (20주, 프레임워크당 2.5K LOC)
 
 **아키텍처:**
 
@@ -301,10 +304,10 @@ Symphony Orchestrator
 ```
 
 **구현 개요:**
-- SPEC.md:133이 암시하는 방향
-- 각 Claw 프레임워크가 Codex app-server 프로토콜을 직접 구현
-- `initialize`, `thread/start`, `turn/start` 메서드 지원
+- Symphony 스펙(`SPEC.md:133`)이 명시적으로 의도한 방향 — "스펙을 구현하는 에이전트는 JSON-RPC app-server 모드를 지원해야 한다"
+- 각 Claw 프레임워크가 app-server 프로토콜을 직접 구현: `initialize`, `thread/start`, `turn/start` 메서드 지원
 - 동일한 JSON-RPC 이벤트 스트림 생성
+- Symphony 참조 구현체(Elixir)가 Codex를 선택한 것처럼, Claw 프레임워크도 동일한 스펙 인터페이스로 동작하는 드라이버를 작성
 
 **구현 부하 (프레임워크당):**
 1. Codex app-server 프로토콜 파서 (200 LOC)
@@ -321,7 +324,7 @@ Symphony Orchestrator
 - OpenAI 독점 프로토콜에 종속 위험
 - 프로토콜 버전 관리 복잡성 증가
 
-**현실성:** 낮음~중간 (생태계 합의 필요)
+**현실성:** 중간~높음 (스펙 준수 경로, 생태계 협력 필요하나 방향 명확)
 
 ### 4.5 전략 E: Unified Agent Interface 스펙 (장기, 6개월+)
 
@@ -353,10 +356,10 @@ UnifiedAgentInterface v1.0
 
 | 전략 | 기간 | LOC | Symphony 수정 | 현실성 | 권장 순서 |
 |------|------|-----|------------|--------|---------|
-| A (Nanobot 래퍼) | 6주 | 1.5K | 낮음 | 중간 | 2단계 |
-| B (OpenClaw 브릿지) | 12주 | 3K | 중간 | 낮음 | 3단계 |
-| C (공동 오케스트레이션) | 8-10주 | 1.5K | 중간 | 높음 | **1단계** |
-| D (Native app-server) | 20주 | 2.5K/프레임워크 | 없음 | 중간 | 장기 |
+| A (Nanobot 래퍼) | 6주 | 1.5K | 낮음 | 중간 | 단기 우회 |
+| B (OpenClaw 브릿지) | 12주 | 3K | 중간 | 낮음 | 비권장 |
+| C (공동 오케스트레이션) | 8-10주 | 1.5K | 중간 | 높음 | **1단계 (단기)** |
+| D (Native app-server) | 20주 | 2.5K/프레임워크 | 없음 | 중간~높음 | **2단계 (정석)** |
 | E (통일 스펙) | 6개월+ | 5K+ | 중간 | 낮음 | 수렴 대기 |
 
 ---
@@ -505,17 +508,17 @@ Symphony Orchestrator
 
 ### 핵심 결론 3가지
 
-**1. Codex 종속은 "AppServer 레이어"에 집중됨**
+**1. Symphony 스펙은 에이전트 런타임 중립 — Codex는 참조 구현의 선택**
 
-Symphony의 Codex 종속성은 `app_server.ex`의 JSON-RPC 프로토콜 하드코딩에만 국한. AgentRunner 위쪽의 스케줄러(Orchestrator)는 에이전트-런타임 중립적으로 재사용 가능. 즉, **AppServer 프로토콜을 래핑하는 어댑터만 있으면 Claw 프레임워크 통합 가능.**
+Symphony(`SPEC.md`)는 스케줄러/트래커 리더로서 어떤 에이전트를 쓸지 강제하지 않는다. Elixir 참조 구현체가 Codex를 선택한 것은 OpenAI 내부 사정이다. **Claw 프레임워크도 동일한 스펙을 구현하는 정당한 에이전트 백엔드다.**
 
-**2. Tracker 어댑터는 즉시 재사용 가능한 설계**
+**2. 전략 D(Native app-server)가 스펙이 의도한 정석 경로**
 
-`tracker.ex`의 5개 콜백 behaviour 만으로 GitHub Issues, ClawPort 등으로 교체 가능. 비용 2-3주. **이는 Symphony의 가장 우아한 설계 부분.**
+`SPEC.md:133`의 방향: app-server 프로토콜을 구현한 에이전트라면 Symphony 스케줄러와 바로 결합 가능. Claw 프레임워크가 드라이버를 작성하면 Symphony 코드 수정 없이 통합된다. **장기적으로 이 경로가 아키텍처상 올바르다.**
 
-**3. 전략 C (공동 오케스트레이션)가 최소 침습 경로**
+**3. 전략 C(공동 오케스트레이션)는 전략 D 이전 현실적 단기 경로**
 
-Symphony의 스케줄링 능력 + Claw의 에이전트 능력을 결합하는 실질적 경로. 8-10주, 양측 코드 최소 변경 (1.5K LOC), 높은 현실성. **Phase 1 권장.**
+스펙 준수 없이 HTTP 브릿지로 빠르게 결합. 8-10주, 1.5K LOC. **Phase 1 검증에 적합하며, Phase 2에서 전략 D로 전환하는 발판이 된다.**
 
 ### 새로운 열린 질문 3가지
 
