@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "lastScanned": 1772879732798,
+  "lastScanned": 1773225478261,
   "projectRoot": "/Users/jaesolshin/Documents/GitHub/compare_claws",
   "techStack": {
     "languages": [],
@@ -33,7 +33,7 @@
       "path": "ideas",
       "purpose": null,
       "fileCount": 4,
-      "lastAccessed": 1772879732790,
+      "lastAccessed": 1773225478253,
       "keyFiles": [
         "idea1.md",
         "idea2.md",
@@ -44,24 +44,189 @@
     "reports": {
       "path": "reports",
       "purpose": null,
-      "fileCount": 5,
-      "lastAccessed": 1772879732791,
+      "fileCount": 11,
+      "lastAccessed": 1773225478253,
       "keyFiles": [
         "browser_actions_report.md",
         "memory_architecture_report.md",
         "openclaw_ecosystem_report.md",
-        "security_report.md",
-        "session_context_report.md"
+        "openfang_report.md",
+        "repos_applied_report.md"
       ]
     },
     "repos": {
       "path": "repos",
       "purpose": null,
       "fileCount": 1,
-      "lastAccessed": 1772879732792,
+      "lastAccessed": 1773225478253,
+      "keyFiles": []
+    },
+    "repos_applied": {
+      "path": "repos_applied",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1773225478254,
+      "keyFiles": []
+    },
+    "repos_research": {
+      "path": "repos_research",
+      "purpose": null,
+      "fileCount": 0,
+      "lastAccessed": 1773225478254,
       "keyFiles": []
     }
   },
-  "hotPaths": [],
+  "hotPaths": [
+    {
+      "path": "repos_research/openclaw-rl/openclaw-opd/openclaw_opd_api_server.py",
+      "accessCount": 5,
+      "lastAccessed": 1773226390775,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-rl/README.md",
+      "accessCount": 4,
+      "lastAccessed": 1773226395453,
+      "type": "file"
+    },
+    {
+      "path": "reports/research_tools_report.md",
+      "accessCount": 3,
+      "lastAccessed": 1773227312497,
+      "type": "file"
+    },
+    {
+      "path": "",
+      "accessCount": 2,
+      "lastAccessed": 1773225530726,
+      "type": "directory"
+    },
+    {
+      "path": "repos_research/openclaw-rl/slime/slime/backends/megatron_utils/loss.py",
+      "accessCount": 2,
+      "lastAccessed": 1773226376595,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-rl/openclaw_api_server.py",
+      "accessCount": 2,
+      "lastAccessed": 1773226391664,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-rl/openclaw_rollout.py",
+      "accessCount": 2,
+      "lastAccessed": 1773226392089,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-opd/README.md",
+      "accessCount": 2,
+      "lastAccessed": 1773226395732,
+      "type": "file"
+    },
+    {
+      "path": "reports/openclaw_rl_patterns_analysis.md",
+      "accessCount": 2,
+      "lastAccessed": 1773226628323,
+      "type": "file"
+    },
+    {
+      "path": "README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773225535672,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-rl/run_qwen3_4b_openclaw_rl.sh",
+      "accessCount": 1,
+      "lastAccessed": 1773226364578,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/slime/slime/utils/ppo_utils.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226372157,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/slime/slime/ray/rollout.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226373095,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-combine/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226375134,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-combine/combine_loss.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226379327,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/terminal-rl/agent_runner.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226379345,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/gui-rl/env_pool_server.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226379725,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw/docs.acp.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226382167,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw/Swabble/docs/spec.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226382609,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226382848,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/swe-rl/swe_utils.py",
+      "accessCount": 1,
+      "lastAccessed": 1773226382991,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/toolcall-rl/README.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226383441,
+      "type": "file"
+    },
+    {
+      "path": "repos_research/openclaw-rl/openclaw-opd",
+      "accessCount": 1,
+      "lastAccessed": 1773226386845,
+      "type": "directory"
+    },
+    {
+      "path": "reports/openclaw_rl_report.md",
+      "accessCount": 1,
+      "lastAccessed": 1773226970371,
+      "type": "file"
+    },
+    {
+      "path": "deepinnovator_architecture_analysis.md",
+      "accessCount": 1,
+      "lastAccessed": 1773227306485,
+      "type": "file"
+    }
+  ],
   "userDirectives": []
 }

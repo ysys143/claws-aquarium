@@ -1,7 +1,7 @@
 {
   "tool_name": "Bash",
-  "tool_input_preview": "{\"command\":\"git subtree add --prefix repos/ClawWork https://github.com/HKUDS/ClawWork main --squash\",\"timeout\":120000,\"description\":\"Add ClawWork as git subtree under repos/\"}",
-  "error": "Exit code 1\nfatal: working tree has modifications.  Cannot add.\n\nfatal: working tree has modifications.  Cannot add.",
-  "timestamp": "2026-03-07T10:37:53.358Z",
+  "tool_input_preview": "{\"command\":\"git subtree add --prefix repos_research/openclaw-rl openclaw-rl main --squash 2>&1\",\"timeout\":120000,\"description\":\"Add OpenClaw-RL as git subtree under repos_research/\"}",
+  "error": "Exit code 1\nfatal: working tree has modifications.  Cannot add.",
+  "timestamp": "2026-03-11T10:43:26.769Z",
   "retry_count": 1
 }

@@ -1,0 +1,8 @@
+# OMC
+.omc/
+
+# Playwright
+.playwright-mcp/
+
+# CWF
+.cwf/
