@@ -1,7 +1,7 @@
 # Claw 에이전트 런타임의 세션/컨텍스트 관리 전략 비교 분석
 
-> **조사 일자**: 2026-03-04
-> **조사 방법**: 7개 에이전트가 각 레포의 실제 소스코드를 병렬로 심층 분석
+> **조사 일자**: 2026-03-04 (OpenJarvis 추가: 2026-03-14)
+> **조사 방법**: 7개 에이전트가 각 레포의 실제 소스코드를 병렬로 심층 분석 (OpenJarvis 별도 추가)
 > **핵심 질문**: "24시간 상주하는 대화형 에이전트가 복잡한 멀티스텝 작업을 수행할 때, 세션과 컨텍스트를 어떻게 관리하는가?"
 
 ---
@@ -18,6 +18,7 @@
    - 3.5 ZeroClaw
    - 3.6 PicoClaw
    - 3.7 TinyClaw
+   - 3.8 OpenJarvis
 4. [핵심 설계 패턴 5가지](#4-핵심-설계-패턴-5가지)
 5. [idea.md 가설 검증](#5-ideamd-가설-검증)
 6. [결론: 아직 아무도 풀지 못한 것](#6-결론-아직-아무도-풀지-못한-것)
@@ -31,7 +32,7 @@
 | 아키타입 | 구현체 | 핵심 원리 |
 |----------|--------|-----------|
 | **A. 프로세스/컨테이너 격리** | NanoClaw, TinyClaw | 컨텍스트 경계 = OS 프로세스/컨테이너 경계 |
-| **B. 세션 키 기반 논리적 격리** | OpenClaw, Nanobot, PicoClaw, ZeroClaw | 세션 키로 대화 히스토리를 논리적으로 분리 |
+| **B. 세션 키 기반 논리적 격리** | OpenClaw, Nanobot, PicoClaw, ZeroClaw, OpenJarvis | 세션 키로 대화 히스토리를 논리적으로 분리 |
 | **C. 보안 계층 기반 격리** | IronClaw | WASM 샌드박스 + 프록시 + 암호화 볼트로 다층 격리 |
 
 **가장 주목할 발견**: 어떤 구현체도 idea.md가 제시한 "메일 읽기 → 일정 확인 → 주간 계획 수립"과 같은 **이종 작업 간 자동 컨텍스트 분리**를 완전히 해결하지 못했다. 현재 가장 가까운 해법은 OpenClaw의 서브에이전트 시스템이지만, 이는 에이전트가 스스로 `sessions_spawn` 도구를 호출해야 하며, "이 작업은 별도 컨텍스트가 필요하다"는 판단을 LLM에 의존한다.
@@ -51,6 +52,7 @@
 | **ZeroClaw** | `session_id` (SQLite 칼럼) | SQLite (WAL + FTS5) | DB 세션 스코프 |
 | **PicoClaw** | `agent:<id>:<channel>:<kind>:<peer>` | JSON 파일 (atomic write) | 채널-피어 단위 격리 |
 | **TinyClaw** | `agent_dir` 경로 | 파일시스템 디렉토리 | 에이전트별 디렉토리 격리 |
+| **OpenJarvis** | `session_id` (SQLite) | SQLite SessionStore | cross-channel 논리적 격리 (SessionIdentity) |
 
 ### 2.2 서브에이전트/멀티에이전트 지원
 
@@ -63,6 +65,7 @@
 | **ZeroClaw** | 없음 (단일 에이전트) | N/A | N/A |
 | **PicoClaw** | 없음 (단일 에이전트 루프) | 50회 도구 반복 | N/A |
 | **TinyClaw** | 분산 액터 모델 (팀 멤버 간 멘션) | 팀 크기 제한 없음 | SQLite 메시지 큐 (`conversation_id`) |
+| **OpenJarvis** | OrchestratorAgent (LoopGuard) | N/A | 시스템 메시지 주입 |
 
 ### 2.3 컨텍스트 윈도우 관리 (컴팩션/요약)
 
@@ -75,6 +78,7 @@
 | **ZeroClaw** | max_history_messages (50) 초과 | 시스템 메시지 보존, 오래된 것부터 삭제 (요약 없음) | SQLite FTS5 + 벡터 임베딩 하이브리드 검색 |
 | **PicoClaw** | 20개 메시지 or 토큰 75% 초과 | 2-pass 요약 (분할→각각 요약→LLM 병합), 최근 4개 보존 | MEMORY.md + 최근 3일 daily notes |
 | **TinyClaw** | Claude `-c` 플래그 (세션 연속) | SDK 자체 관리 | 에이전트별 AGENTS.md |
+| **OpenJarvis** | consolidation_threshold: 100 메시지 (Nanobot과 동일) | LoopGuard 반복 탐지 → 컨텍스트 압축; RLM Agent: Python REPL 변수로 저장 | SQLite 세션 저장소 |
 
 ---
 
@@ -220,6 +224,53 @@ TinyClaw는 중앙 오케스트레이터 없이 에이전트들이 메시지 패
 
 ---
 
+### 3.8 OpenJarvis — Cross-Channel 세션 + RLM 컨텍스트 변수화
+
+**핵심 패턴: SessionIdentity 다채널 매핑 + LoopGuard 반복 탐지 + RLM Context-as-Variable**
+
+OpenJarvis는 10번째 프레임워크로, 멀티채널 운영 환경에서의 세션 연속성과 긴 컨텍스트 처리를 독자적인 방식으로 해결한다.
+
+**세션 저장소**: SQLite 기반 `SessionStore`. `session_id`를 기본 키로 하며 `max_age_hours: 24.0` 만료 정책과 자동 decay 정리를 내장한다. Nanobot과 동일한 100 메시지 `consolidation_threshold`를 사용한다.
+
+**cross-channel SessionIdentity (독특한 패턴)**: 다른 모든 구현체는 단일 채널의 사용자 ID를 세션 키로 쓰지만, OpenJarvis의 `SessionIdentity`는 `channel_ids` dict로 여러 채널의 사용자 ID를 하나의 세션에 묶는다:
+
+```python
+SessionIdentity(
+    channel_ids={
+        "slack":    "U12345",
+        "telegram": "@user",
+        "web":      "sess_abc"
+    }
+)
+```
+
+이를 통해 Slack에서 시작한 대화를 Telegram에서 이어받고, 웹 UI에서도 동일한 컨텍스트로 접근할 수 있다. 9개 기존 구현체 중 이 패턴을 가진 구현체는 없다.
+
+**LoopGuard (반복 tool call 탐지 + 컨텍스트 압축)**: OrchestratorAgent 내부의 `LoopGuard`는 에이전트가 동일한 tool call을 반복할 때 이를 탐지하고 컨텍스트를 압축한다. IronClaw의 `pending_auth` 상태 머신처럼 특정 조건에서 일반 파이프라인을 우회하는 패턴이지만, 목적은 자격증명 보호가 아닌 무한루프 방지다.
+
+**TaskScheduler**: cron/interval/once 세 가지 모드를 지원하는 daemon 프로세스. SQLite에 스케줄 상태를 영속화한다. OpenClaw의 cron 세션 유형(`agent:<id>:cron:<uuid>`)과 유사하나, OpenJarvis는 스케줄러를 독립 daemon으로 분리했다.
+
+**RLM Agent — Context-as-Variable (가장 독특한 패턴)**: arxiv:2512.24601에서 제안된 RLM(Reasoning Language Model) 패턴을 구현. 긴 컨텍스트를 LLM 프롬프트에 직접 포함하는 대신, **Python REPL 변수에 저장**하고 코드로 참조하게 한다:
+
+```python
+# 기존 방식: 컨텍스트 윈도우에 직접 주입 (토큰 소비)
+system_prompt = f"Here is the document: {long_document}"
+
+# RLM 방식: Python 변수로 저장, 코드로 참조 (토큰 절약)
+repl.exec(f"document = {repr(long_document)}")
+# LLM은 document 변수를 코드로 조작
+```
+
+이는 ZeroClaw의 `compact_context` 모드(소형 모델용, 미구현)와 같은 문제를 완전히 다른 방향으로 해결한다. "컨텍스트 압축"이 아니라 "컨텍스트 외재화"다.
+
+**주요 특이점 요약**:
+- cross-channel 세션 연속성: 9개 기존 구현체에 없는 패턴
+- RLM Context-as-Variable: 컨텍스트 윈도우 문제를 코드 실행으로 우회
+- LoopGuard: 프레임워크 레벨의 반복 탐지 (에이전트 프롬프트 의존 아님)
+- TaskScheduler daemon: SQLite 영속화 스케줄러
+
+---
+
 ## 4. 핵심 설계 패턴 5가지
 
 ### 패턴 1: "세션 키가 세계를 정의한다"
@@ -227,14 +278,17 @@ TinyClaw는 중앙 오케스트레이터 없이 에이전트들이 메시지 패
 모든 구현체에서 세션 키의 구조가 격리 수준을 결정한다.
 
 ```
-OpenClaw:  agent:<id>:<type>:<uuid>      → 에이전트+유형+인스턴스 격리
-IronClaw:  (user, channel, thread_id)   → 유저+채널+스레드 격리
-PicoClaw:  agent:<id>:<ch>:<kind>:<peer> → 에이전트+채널+종류+상대 격리
-Nanobot:   channel:chat_id              → 채널+채팅 격리
-NanoClaw:  group_folder                 → 그룹(채팅방) 격리
-TinyClaw:  agent_dir path               → 에이전트 디렉토리 격리
-ZeroClaw:  session_id (DB column)       → DB 레코드 격리
+OpenClaw:   agent:<id>:<type>:<uuid>           → 에이전트+유형+인스턴스 격리
+IronClaw:   (user, channel, thread_id)         → 유저+채널+스레드 격리
+PicoClaw:   agent:<id>:<ch>:<kind>:<peer>      → 에이전트+채널+종류+상대 격리
+Nanobot:    channel:chat_id                    → 채널+채팅 격리
+NanoClaw:   group_folder                       → 그룹(채팅방) 격리
+TinyClaw:   agent_dir path                     → 에이전트 디렉토리 격리
+ZeroClaw:   session_id (DB column)             → DB 레코드 격리
+OpenJarvis: session_id + channel_ids dict      → DB 레코드 격리 + cross-channel 통합
 ```
+
+**OpenJarvis의 혁신**: 세션 키가 단순한 "격리 단위"를 넘어 "통합 단위"로 기능한다. `channel_ids: {"slack": "U12345", "telegram": "@user"}` 구조로 여러 채널의 동일 사용자를 하나의 세션에 묶는다. 다른 구현체들의 세션 키가 분리를 위한 키라면, OpenJarvis의 SessionIdentity는 연결을 위한 키다.
 
 **교훈**: 세션 키 설계는 아키텍처의 가장 근본적인 결정이다. 키가 복잡할수록 세밀한 격리가 가능하지만, 키 관리 복잡도도 비례하여 증가한다.
 
@@ -272,6 +326,7 @@ TinyClaw:  SQLite 큐에 conversation_id로 연결된 메시지 삽입
 | PicoClaw | `MEMORY.md` + daily notes | 시스템 프롬프트에 전문 주입 |
 | OpenClaw | 워크스페이스 파일 | 플러그인 기반 주입 |
 | IronClaw | 워크스페이스 일일 로그 | 컴팩션 결과 저장 |
+| OpenJarvis | SQLite SessionStore | 세션 로드 시 컨텍스트 재구성; RLM Agent는 Python REPL 변수로 외재화 |
 
 **교훈**: LLM에게 장기 기억을 제공하는 가장 보편적인 방법은 마크다운 파일을 시스템 프롬프트에 주입하는 것이다. 이는 단순하지만 효과적이며, 사람이 직접 편집할 수 있다는 장점이 있다. ZeroClaw의 "Atomic Soul Export" (DB→마크다운 스냅샷→DB 복원)은 이 패턴의 가장 정교한 변형.
 
@@ -337,6 +392,8 @@ IronClaw만이 이 문제를 체계적으로 해결했다:
 | 장기 기억 | 마크다운 + 벡터 DB | ZeroClaw (하이브리드 검색 + 스냅샷) |
 | 엣지 디바이스 안정성 | 원자적 쓰기 + 비동기 요약 | PicoClaw (fsync + 2-pass) |
 | 멀티에이전트 협업 | 메시지 큐 + 액터 모델 | TinyClaw (SQLite 큐 + Promise 체인) |
+| **cross-channel 세션 연속성** | SessionIdentity channel_ids dict | **OpenJarvis** (Slack+Telegram+Web 통합) |
+| **컨텍스트 윈도우 초과 (대형 문서)** | Python REPL 변수 외재화 (RLM) | **OpenJarvis** (Context-as-Variable) |
 
 ### 아직 풀리지 않은 문제
 
@@ -352,4 +409,4 @@ IronClaw만이 이 문제를 체계적으로 해결했다:
 
 ---
 
-> **최종 요약**: idea.md의 핵심 통찰은 정확했다. "이게 다야"라는 아키텍처 원형 분석도, "세션과 컨텍스트 관리가 진짜 쟁점"이라는 문제 정의도 코드 레벨에서 검증된다. 7개 구현체 모두 이 문제에 코드의 1/4~2/5를 투자하고 있으며, 각자 다른 트레이드오프를 선택했다. 그러나 "자동 컨텍스트 분리 판단"이라는 핵심 문제는 아직 어느 구현체도 프레임워크 레벨에서 해결하지 못했다.
+> **최종 요약**: idea.md의 핵심 통찰은 정확했다. "이게 다야"라는 아키텍처 원형 분석도, "세션과 컨텍스트 관리가 진짜 쟁점"이라는 문제 정의도 코드 레벨에서 검증된다. 8개 구현체 모두 이 문제에 코드의 1/4~2/5를 투자하고 있으며, 각자 다른 트레이드오프를 선택했다. OpenJarvis는 두 가지 새로운 방향을 제시했다: (1) 세션을 "격리 단위"가 아닌 "cross-channel 통합 단위"로 재정의하는 SessionIdentity, (2) 컨텍스트를 압축하는 대신 Python REPL 변수로 외재화하는 RLM Context-as-Variable. 그러나 "자동 컨텍스트 분리 판단"이라는 핵심 문제는 아직 어느 구현체도 프레임워크 레벨에서 해결하지 못했다.

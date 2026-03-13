@@ -1,7 +1,7 @@
-# 실세계 권한 부여 보안 전략 — 7개 Claw 코드 기반 비교 분석
+# 실세계 권한 부여 보안 전략 — 10개 Claw 코드 기반 비교 분석
 
-> **조사 일자**: 2026-03-05
-> **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석
+> **조사 일자**: 2026-03-05 (OpenJarvis 추가: 2026-03-14)
+> **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석 (OpenJarvis는 단독 추가 분석)
 > **핵심 질문**: "에이전트에게 실세계 권한을 안전하게 부여하기 위해 각 프레임워크가 어떤 보안 전략을 채택했는가?"
 
 ---
@@ -19,20 +19,21 @@
 
 ## 1. Executive Summary
 
-7개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
+10개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
 
 | 계층 | 구현체 | 특징 |
 |------|--------|------|
 | **Tier 1: Defense-in-Depth** | IronClaw, ZeroClaw | 암호화 볼트 + WASM/Docker 이중 샌드박스 + 다층 인젝션 방어 + HITL 승인 + 비용 제한 |
-| **Tier 2: Container-First** | NanoClaw, OpenClaw | Docker 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어 |
+| **Tier 2: Container-First** | NanoClaw, OpenClaw, **OpenJarvis** | Docker/subprocess 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어. OpenJarvis는 Prompt Injection Scanner 명시적 구현으로 Tier 2 상단에 위치 |
 | **Tier 3: Denylist-Based** | Nanobot, PicoClaw | 정규식 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음 |
 | **Tier 4: Minimal/None** | TinyClaw | 보안 메커니즘 최소 또는 해당 없음 (실험적 용도) |
 
-**가장 주목할 발견 3가지:**
+**가장 주목할 발견 4가지:**
 
-1. **암호화 볼트를 구현한 곳은 IronClaw과 ZeroClaw 뿐이다.** 나머지 5개는 전부 평문 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305.
-2. **Human-in-the-loop를 구현한 곳은 2개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop). 나머지 5개는 에이전트가 도구를 자율 실행.
-3. **프롬프트 인젝션 방어에 전용 레이어를 둔 곳은 IronClaw과 ZeroClaw 뿐이다.** IronClaw는 SafetyLayer 4중 방어, ZeroClaw는 PromptGuard 6패턴 탐지. 나머지는 레이블링(Nanobot) 또는 마커 래핑(OpenClaw) 수준.
+1. **암호화 볼트를 구현한 곳은 IronClaw과 ZeroClaw 뿐이다.** 나머지 8개는 전부 평문 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305.
+2. **Human-in-the-loop를 구현한 곳은 2개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop). 나머지 8개는 에이전트가 도구를 자율 실행.
+3. **프롬프트 인젝션 방어에 전용 레이어를 둔 곳은 IronClaw, ZeroClaw, OpenJarvis 3개뿐이다.** IronClaw는 SafetyLayer 4중 방어, ZeroClaw는 PromptGuard 6패턴 탐지, **OpenJarvis는 10개 프레임워크 중 유일하게 regex 기반 Prompt Injection Scanner를 명시적으로 구현** (4개 위협 수준: LOW/MEDIUM/HIGH/CRITICAL). 나머지는 레이블링(Nanobot) 또는 마커 래핑(OpenClaw) 수준.
+4. **Taint Tracking을 구현한 곳은 OpenJarvis뿐이다 (10개 중 유일).** 4-label 분류(PII/SECRET/USER_PRIVATE/EXTERNAL)와 SINK_POLICY로 데이터 흐름을 제어한다.
 
 ---
 
@@ -49,6 +50,7 @@
 | **ZeroClaw** | 3단계 AutonomyLevel (ReadOnly/Supervised/Full) + 명령어 위험도 분류 | O (High/Medium/Low 분류) | `src/security/policy.rs:10-18` |
 | **PicoClaw** | AllowFrom + 서브에이전트 spawn 허용목록 + 에이전트 바인딩 | △ (spawn만 제어) | `pkg/tools/spawn.go:78-82` |
 | **TinyClaw** | Pairing 시스템만 | X | `src/lib/pairing.ts:73-81` |
+| **OpenJarvis** | RBAC 10종 (Python+Rust 이중 구현) + Taint Tracking SINK_POLICY | O (도구별 taint label 기반 차단) | RBAC 모듈, `sink_policy.py` |
 
 ### 2.2 자격증명 관리
 
@@ -61,6 +63,7 @@
 | **ZeroClaw** | ChaCha20-Poly1305 AEAD | **O** | X (파일 기반 .secret_key) | 로그 자동 redact | `src/security/secrets.rs:1-22` |
 | **PicoClaw** | `auth.json` (평문, 0600) | X | X | env 태그 지원 | `pkg/auth/store.go:41-44` |
 | **TinyClaw** | `settings.json` (평문) | X | X | X (API로 노출) | `lib/setup-wizard.sh:364-386` |
+| **OpenJarvis** | 평문 (환경변수/config) | X | X | Taint Tracking으로 SECRET label 전파 추적 | `taint_tracker.py`, `sink_policy.py` |
 
 ### 2.3 샌드박싱
 
@@ -73,6 +76,7 @@
 | **ZeroClaw** | O | **O** (wasmi, 10억fuel) | Landlock/Firejail/Bubblewrap | workspace_only 기본 활성 | `src/security/detect.rs:8-71`, `src/runtime/wasm.rs:1-80` |
 | **PicoClaw** | △ (기본 격리만) | X | `os.Root` 기반 샌드박스 | restrictToWorkspace 기본 활성 | `pkg/tools/filesystem.go:281-390` |
 | **TinyClaw** | X | X | X | 디렉터리만 분리 | `--dangerously-skip-permissions` 항상 사용 |
+| **OpenJarvis** | X (subprocess_sandbox) | X | SSRF 방지 + 감사로그 | SINK_POLICY 기반 데이터 흐름 제한 | `subprocess_sandbox.py`, `audit_log.py` |
 
 ### 2.4 도구 실행 안전성
 
@@ -85,6 +89,7 @@
 | **ZeroClaw** | **5중 방어**(서브쉘/리다이렉션/tee/백그라운드/화이트리스트) | WASM 호스트 화이트리스트 | null바이트/URL인코딩/~user 차단 | — | `src/security/policy.rs:726-816` |
 | **PicoClaw** | **77개 정규식** denylist + 커스텀 패턴 | — | `filepath.IsLocal()` + 심링크 추적 | 10,000자 | `pkg/tools/shell.go:29-77` |
 | **TinyClaw** | X (제한 없음) | X | X | — | `--dangerously-skip-permissions` |
+| **OpenJarvis** | RBAC 10종 + SINK_POLICY (web_search: PII+SECRET 금지, channel_send: SECRET 금지, code_interpreter: SECRET 금지) | SSRF 방지 | Taint label 기반 경로 제한 | 속도 제한 | `rbac.py`, `sink_policy.py` |
 
 ### 2.5 Human-in-the-Loop
 
@@ -97,6 +102,7 @@
 | **ZeroClaw** | **O** (Supervised 모드 + Yes/No/Always) | 중/고위험 명령 | **E-Stop** (4단계 + OTP) | `src/approval/mod.rs:156-185`, `src/security/estop.rs` |
 | **PicoClaw** | X (자율 실행) | — | — | `pkg/tools/toolloop.go:134-158` |
 | **TinyClaw** | △ (Pairing만, 도구 승인 없음) | 채널 접근만 | — | `src/lib/pairing.ts:73-81` |
+| **OpenJarvis** | X (자율 실행) | — | — | RBAC + 감사로그로 사후 추적 |
 
 ### 2.6 비용/속도 제한
 
@@ -109,6 +115,7 @@
 | **ZeroClaw** | 시간당 20회 쓰기/실행 | **일별 $5 하드 한도** | — | `src/cost/tracker.rs:50-100` |
 | **PicoClaw** | 제공자 지수 백오프 쿨다운 | X | RPM 설정, max_tokens=32768 | `pkg/providers/cooldown.go:183-207` |
 | **TinyClaw** | X | X | 대화당 50메시지, 재시도 5회, TTL 30분 | `src/lib/conversation.ts:12` |
+| **OpenJarvis** | 속도 제한 (구현) | X | — | `rate_limiter.py` |
 
 ### 2.7 프롬프트 인젝션 방어
 
@@ -121,6 +128,7 @@
 | **ZeroClaw** | **O** (PromptGuard 6패턴) | 시스템 오버라이드/역할혼란/JSON인젝션/시크릿추출/커맨드인젝션/탈옥 탐지 | `src/security/prompt_guard.rs` |
 | **PicoClaw** | X | 없음 (셸 denylist이 간접 방어) | — |
 | **TinyClaw** | X | 없음 (`[@teammate:]` 태그 파싱이 인젝션 벡터) | `src/lib/routing.ts:66` |
+| **OpenJarvis** | **O** (Prompt Injection Scanner) | regex 기반 스캔 + 4개 위협 수준 분류 (LOW/MEDIUM/HIGH/CRITICAL) — 10개 프레임워크 중 명시적 Scanner 유일 | `prompt_injection_scanner.py` |
 
 ---
 
@@ -175,6 +183,22 @@
 - **약점(전면적)**: 인증 없는 REST API, CORS 와일드카드, 평문 자격증명 API 노출, `--dangerously-skip-permissions` 항상 사용, 프롬프트 인젝션 방어 없음, `[@teammate:]` 태그 파싱이 인젝션 벡터
 - **유일한 강점**: Pairing 코드 `crypto.randomBytes` 생성
 
+### 3.8 OpenJarvis — "Taint Tracking + Prompt Injection Scanner의 선구자"
+
+**보안 철학**: RBAC 기반 접근 제어 + Taint Tracking으로 데이터 흐름 추적 + Prompt Injection Scanner로 입력 위협 탐지. Docker 없이도 소프트웨어 계층 보안을 다층으로 구현.
+
+- **강점**:
+  - **Prompt Injection Scanner**: 10개 프레임워크 중 유일한 명시적 구현. regex 기반으로 4개 위협 수준(LOW/MEDIUM/HIGH/CRITICAL) 분류
+  - **Taint Tracking 4-label**: PII/SECRET/USER_PRIVATE/EXTERNAL 레이블 전파. SINK_POLICY로 도구별 금지 레이블 지정 (web_search: PII+SECRET 금지, channel_send: SECRET 금지, code_interpreter: SECRET 금지)
+  - **RBAC 10종 이중 구현**: Python+Rust 양측에서 권한 검사. 단일 언어 구현 대비 우회 난이도 높음
+  - **SSRF 방지**: 서버사이드 요청 위조 방어 명시적 구현
+  - **감사 로그**: 모든 도구 실행 기록
+- **약점**:
+  - WASM/Docker 컨테이너 격리 없음 → subprocess_sandbox만으로는 Tier 1 수준 미달
+  - 자격증명 암호화 없음 (평문 저장)
+  - HITL 없음 (자율 실행)
+  - 비용/예산 하드 한도 없음
+
 ---
 
 ## 4. 핵심 보안 패턴 5가지
@@ -215,6 +239,7 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
     ZeroClaw ─────── WASM + Landlock/Firejail/Bubblewrap/Docker
     NanoClaw ─────── Docker (non-root, mount-security)
     OpenClaw ─────── Docker (seccomp/AppArmor 검증)
+    OpenJarvis ───── subprocess_sandbox + SSRF 방지 (Docker 없음)
     PicoClaw ─────── os.Root 파일시스템 + Docker (기본)
     Nanobot ──────── Docker (root 실행!)
     TinyClaw ─────── 디렉터리 분리만
@@ -236,6 +261,7 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
 ### 패턴 5: "프롬프트 인젝션 방어" 계층 구조
 
 ```
+Layer 5: 전용 탐지 + 차단 + 위협 수준 분류 (OpenJarvis Prompt Injection Scanner: LOW/MEDIUM/HIGH/CRITICAL)
 Layer 4: 전용 탐지 + 차단 (IronClaw SafetyLayer, ZeroClaw PromptGuard)
 Layer 3: 경계 마커 + 패턴 탐지 (OpenClaw external-content)
 Layer 2: 레이블링 + 이스케이프 (Nanobot 컨텍스트 태그, NanoClaw 스케줄 태그)
@@ -297,9 +323,24 @@ Karpathy의 "git worktree로 격리 + 파일 기반 통신 + tmux 대시보드" 
 
 Karpathy의 접근은 보안 관점에서 보면 **Tier 2 수준**(Docker 없는 NanoClaw)에 해당한다. 파일시스템 격리는 있지만 암호화, HITL, 인젝션 방어는 없다.
 
+### 논의 5: OpenJarvis의 Taint Tracking — 새로운 보안 패러다임
+
+OpenJarvis가 도입한 Taint Tracking은 기존 10개 프레임워크에 없던 **데이터 중심 보안 모델**이다:
+
+- **기존 모델**: "이 도구를 실행해도 되는가?" (도구 중심)
+- **Taint Tracking 모델**: "이 데이터를 이 도구에 전달해도 되는가?" (데이터 흐름 중심)
+
+SINK_POLICY 예시:
+- `web_search`: PII + SECRET label 데이터 전달 금지 → 개인정보/시크릿이 외부 검색에 노출되는 경로 차단
+- `channel_send`: SECRET label 금지 → 메신저 채널로 시크릿 유출 방지
+- `code_interpreter`: SECRET label 금지 → 코드 실행 컨텍스트로 시크릿 주입 방지
+
+이 패턴은 IronClaw의 Zero-Exposure(프록시 주입)와 목표는 같지만 구현 방식이 다르다. Zero-Exposure는 "에이전트가 값을 볼 수 없게"이고, Taint Tracking은 "에이전트가 값을 받더라도 특정 경로로 흘려보낼 수 없게"이다.
+
 ### 열린 질문 (보안 관점)
 
 1. **동적 도구 위험도 평가**: 새로 등록되는 MCP 도구의 위험도를 자동 분류하고 적절한 승인 수준을 할당하는 메커니즘이 가능한가?
 2. **비용 하드 한도의 보편화**: ZeroClaw만 일별 $5 한도를 구현했다. 24시간 에이전트에서 비용 폭발은 현실적 위험인데, 왜 다른 구현체는 이를 무시하는가?
-3. **프롬프트 인젝션의 근본적 한계**: IronClaw의 18개 패턴, ZeroClaw의 6개 패턴은 알려진 공격만 탐지한다. 새로운 인젝션 기법에 대한 적응형 방어가 가능한가?
+3. **프롬프트 인젝션의 근본적 한계**: IronClaw의 18개 패턴, ZeroClaw의 6개 패턴, OpenJarvis의 regex Scanner는 알려진 공격만 탐지한다. 새로운 인젝션 기법에 대한 적응형 방어가 가능한가?
 4. **E-Stop의 메신저 통합**: ZeroClaw의 E-Stop을 Telegram 기반 시스템에서 구현하면 어떤 형태가 되는가? 메시지 하나로 에이전트를 즉시 정지시킬 수 있는가?
+5. **Taint Tracking의 완전성**: OpenJarvis의 4-label 분류(PII/SECRET/USER_PRIVATE/EXTERNAL)는 실제 데이터 흐름을 얼마나 커버하는가? LLM이 label을 우회하는 방식으로 데이터를 재포장(paraphrase)하면 방어가 무력화되지 않는가?

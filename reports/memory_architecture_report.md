@@ -577,9 +577,11 @@ brain.db -> MEMORY_SNAPSHOT.md -> git commit -> DB 손실 -> git checkout -> hyd
 
 5. **Tier 2의 단순함은 실전 가치가 있다**: 사람이 읽을 수 있는 MEMORY.md는 디버깅, 감사, 수동 수정에서 DB보다 우월. 복잡성과 투명성의 트레이드오프.
 
+6. **메모리 마이크로서비스 패턴이 등장 중**: Google ADK의 always-on-memory-agent(2026)는 기억을 에이전트 내장이 아닌 **독립 HTTP 서비스**로 분리. ingest/consolidate/query 3-agent orchestrator + 30분 주기 sleep consolidation 타이머. 9개 Claw는 모두 메모리를 내장형으로 구현하는 반면, 이 패턴은 메모리를 외부 에이전트가 소비하는 서비스로 제공. 단, 벡터 없이 LLM이 전체 메모리를 직접 읽는 구조라 대규모에서 비용/속도 한계 존재.
+
 ### 열린 질문 (idea.md 논의 7)
 
-**Q11**: 기억 consolidation의 최적 주기는? Nanobot(100 메시지), ZeroClaw(12h), OpenClaw(5초 debounce) -- 어떤 리듬이 24시간 에이전트에 맞는가?
+**Q11**: 기억 consolidation의 최적 주기는? Nanobot(100 메시지), ZeroClaw(12h), OpenClaw(5초 debounce), always-on-memory-agent(30분, 수면 통합 비유) -- 어떤 리듬이 24시간 에이전트에 맞는가?
 
 **Q12**: 벡터 검색 vs FTS의 실전 recall 비교 -- 메신저 대화 맥락에서 어느 쪽이 실제로 더 유용한 기억을 찾아오는가?
 

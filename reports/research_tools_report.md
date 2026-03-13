@@ -641,6 +641,9 @@ def evaluate_bpb(model, tokenizer, batch_size):
    - R4: Hierarchical Agent Pipeline (4-layer 계층)
    - R5: Deep Synthesis Principle (깊이 있는 합성 원칙)
 
+   **외부 참조 패턴 (Google ADK, always-on-memory-agent, 2026)**:
+   - R9: Sleep Consolidation Loop — 인간 수면 중 기억 통합을 명시적으로 모델링한 주기적 에이전트. 30분 타이머로 unconsolidated 기억을 병합하고 cross-cutting insight 추출. "24시간 상주"는 Claude Code ralph/Autoresearch NEVER STOP과 동일 개념이나, **수면 통합 비유 + 메모리 마이크로서비스 분리(HTTP API)**는 신규 패턴. 단, 벡터 없이 LLM이 전체 메모리를 직접 읽는 구조라 Claw Tier 1 대비 스케일링 한계 존재.
+
 4. **"Research Instruction Document" 제안**: program.md(루프) + HAND.toml(도구/권한) + ZeroClaw(기억 스냅샷)을 결합한 새로운 에이전트 지시 형식.
 
 ### 8.2 신규 오픈 퀘스천
