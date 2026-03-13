@@ -182,7 +182,7 @@
 |------|------|----------------------|
 | **QClaw** | SMB | High - 소비자가 무료 에이전트 받으면 SMB는 왜 유료? |
 | **WorkBuddy** | 엔터프라이즈 | Low - 다른 에코시스템 (WeChat Work vs personal) |
-| **WeChat Agent** | 소비자 | Internal cannibalization |
+| **WeChat Agent** | 소비자 | High - 자체 제품 간 판매 충돌 (무료가 유료 QClaw 시장 침범) |
 
 **해결책** (Tencent의 가능한 전략):
 - QClaw -> 전문화된 에이전트 마켓플레이스로 전환
