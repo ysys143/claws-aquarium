@@ -6,3 +6,6 @@
 
 # CWF
 .cwf/
+
+# macOS
+.DS_Store
