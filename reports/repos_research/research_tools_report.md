@@ -45,29 +45,29 @@
 
 ### 2.1 기본 정보
 
-| 항목 | DeepInnovator | Autoresearch |
-|------|--------------|--------------|
-| **저자** | HKUDS (홍콩대) | Karpathy |
-| **언어** | Python | Python |
-| **규모** | ~105K LOC, 402 파일 | ~1K LOC, 3 파일 |
-| **목적** | RL 기반 연구 아이디어 생성 모델 훈련 | 자율 ML 실험 반복 |
-| **에이전트 수** | 7개 (YAML 설정) | 1개 (LLM 자체) |
-| **도구** | MCP + Sandbox + 검색 | 없음 (코드 수정만) |
-| **기억** | JSON 파일 계층적 | results.tsv + Git |
-| **보상** | GRPO + Delta Reward + Token Amount | val_bpb (낮을수록 좋음) |
-| **루프** | 데이터 준비 파이프라인 (4단계) | 무한 루프 (5분/실험) |
+| 항목 | DeepInnovator | Autoresearch | OpenClaw-RL |
+|------|--------------|--------------|-------------|
+| **저자** | HKUDS (홍콩대) | Karpathy | Gen-Verse |
+| **언어** | Python | Python | Python |
+| **규모** | ~105K LOC, 402 파일 | ~1K LOC, 3 파일 | ~1K LOC, 3 핵심 파일 |
+| **목적** | RL 기반 연구 아이디어 생성 모델 훈련 | 자율 ML 실험 반복 | 대화를 통한 에이전트 온라인 강화학습 |
+| **에이전트 수** | 7개 (YAML 설정) | 1개 (LLM 자체) | 4개 독립 컴포넌트 |
+| **도구** | MCP + Sandbox + 검색 | 없음 (코드 수정만) | FastAPI + SGLang + Ray |
+| **기억** | JSON 파일 계층적 | results.tsv + Git | 없음 (stateless) |
+| **보상** | GRPO + Delta Reward + Token Amount | val_bpb (낮을수록 좋음) | PRM 턴별 {+1,-1,0}, m=3 다수결 |
+| **루프** | 데이터 준비 파이프라인 (4단계) | 무한 루프 (5분/실험) | 온라인 (요청 기반, 무한) |
 
 ### 2.2 Claw 패턴 대비
 
-| 패턴 | DeepInnovator | Autoresearch | 가장 유사한 Claw |
-|------|--------------|--------------|----------------|
-| **에이전트 지시** | YAML 프롬프트 | program.md | HAND.toml (OpenFang) |
-| **기억 관리** | JSON 파일 계층 | results.tsv + Git | ZeroClaw Soul Snapshot |
-| **도구 통합** | MCP + Native | 없음 | Nanobot (MCP) |
-| **보안/격리** | VERL 샌드박스 | prepare.py 읽기전용 | IronClaw (Capability) |
-| **비용 제한** | 없음 | 5분 고정 예산 | ZeroClaw ($5/일) |
-| **검증** | Discriminator | val_bpb 비교 | 없음 (신규 패턴) |
-| **병렬 실행** | Step 3 병렬 가능 | 순차 | PicoClaw (goroutine) |
+| 패턴 | DeepInnovator | Autoresearch | OpenClaw-RL | 가장 유사한 Claw |
+|------|--------------|--------------|-------------|----------------|
+| **에이전트 지시** | YAML 프롬프트 | program.md | 없음 (요청 기반) | HAND.toml (OpenFang) |
+| **기억 관리** | JSON 파일 계층 | results.tsv + Git | 없음 (stateless) | ZeroClaw Soul Snapshot |
+| **도구 통합** | MCP + Native | 없음 | FastAPI 프록시 | Nanobot (MCP) |
+| **보안/격리** | VERL 샌드박스 | prepare.py 읽기전용 | GPU 분리 (SGLang) | IronClaw (Capability) |
+| **비용 제한** | 없음 | 5분 고정 예산 | 없음 | ZeroClaw ($5/일) |
+| **검증** | Discriminator | val_bpb 비교 | PRM 다수결 (m=3) | 없음 (신규 패턴) |
+| **병렬 실행** | Step 3 병렬 가능 | 순차 | 4개 컴포넌트 완전 비동기 | PicoClaw (goroutine) |
 
 ---
 
