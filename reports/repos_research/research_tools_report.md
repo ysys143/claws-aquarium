@@ -1,6 +1,6 @@
 # 연구 자동화 도구 분석: DeepInnovator & Autoresearch
 
-> **분석 대상**: repos_research/ 내 2개 연구 자동화 도구
+> **분석 대상**: repos_research/ 내 3개 연구 자동화 도구
 > **교차 참조**: 기존 9개 Claw 런타임 분석 (5개 보고서)
 > **작성 일자**: 2026-03-09
 
@@ -8,7 +8,7 @@
 
 ## 1. Executive Summary
 
-기존 `repos/`의 9개 에이전트 런타임 프레임워크와 달리, `repos_research/`의 2개 도구는 **연구 자동화**라는 특수 목적에 집중한다. 이 보고서는 두 도구의 아키텍처를 분석하고, 기존 Claw 패턴과의 교차 매핑을 통해 idea3(AI Research Agent), idea4(Lab AI Agent) 설계에 활용할 패턴을 추출한다.
+기존 `repos/`의 9개 에이전트 런타임 프레임워크와 달리, `repos_research/`의 3개 도구는 **연구 자동화**라는 특수 목적에 집중한다. 이 보고서는 두 도구의 아키텍처를 분석하고, 기존 Claw 패턴과의 교차 매핑을 통해 idea3(AI Research Agent), idea4(Lab AI Agent) 설계에 활용할 패턴을 추출한다.
 
 ### 핵심 발견
 
@@ -431,13 +431,75 @@ def evaluate_bpb(model, tokenizer, batch_size):
 - **Vocab-size 독립**: 아키텍처 간 공정한 비교
 - **베이스라인**: val_bpb = 0.997900, VRAM = 44.0 GB, MFU = 39.80%
 
+
 ---
 
-## 6. Claw 패턴 매핑
+## 6. OpenClaw-RL: 대화에서 학습으로
+
+> **분석 대상**: `repos_research/openclaw-rl/` — Gen-Verse/OpenClaw-RL (1,526 stars)
+> **상세 분석**: `reports/repos_research/details/openclaw_rl_report.md`
+
+OpenClaw-RL은 기존 두 도구와 **근본적으로 다른 설계 목표**를 가진다: "대화를 통해 에이전트가 어떻게 스스로 개선할 것인가"
+
+### 6.1 기본 정보
+
+| 항목 | 내용 |
+|------|------|
+| **저자/조직** | Gen-Verse (THUDM 계열) |
+| **언어** | TypeScript 31MB, Python 12.5MB |
+| **규모** | 1,526 stars (2026-03-11 기준) |
+| **목적** | 대화 피드백으로 개인화 AI 에이전트를 온라인 RL 훈련 |
+| **하드웨어 요구** | 8x GPU (CUDA 12.9, Python 3.12) |
+
+### 6.2 3대 신규 패턴 (R6-R8)
+
+**R6: Conversation-to-Gradient** — 다음 사용자 메시지를 RL 학습 신호로 자동 변환
+
+명시적 레이블 불필요: 다음 메시지가 암묵적 평가. 신호 밀도: 매 turn (3-5x higher than R1/R2). X-Turn-Type 헤더로 "main"(학습)/"side"(추론전용) 분리.
+
+**R7: Async 4-Component Architecture** — 서빙/수집/PRM/훈련이 독립 비동기 루프
+
+| 컴포넌트 | 역할 | GPU |
+|---------|------|-----|
+| Agent Serving (SGLang) | 정책 모델 배포, logprob 수집 | ACTOR_GPUS=4 |
+| Rollout Collection (FastAPI) | API 요청 처리, 샘플 버퍼링 | ROLLOUT_GPUS=2 |
+| PRM Judging | 비동기 reward 평가 (m=3 병렬) | PRM_GPUS=2 |
+| Policy Training (Ray actor) | GRPO/OPD loss, 가중치 업데이트 | ACTOR_GPUS |
+
+컴포넌트 간 결합: queue.Queue(maxsize=100000). Graceful Weight Update: pause_submission() → 업데이트 → resume_submission(). 기존 9개 Claw는 모두 동기식 또는 순차 처리.
+
+**R8: OPD with Hindsight Hints** — 다음 상태 피드백에서 힌트 추출 → 토큰 레벨 teacher 신호
+
+힌트 선택: m개 투표 중 가장 긴 non-trivial 힌트 (최소 10자). 스칼라 보상 대비 훨씬 풍부한 방향성 제공. SDFT/SDPO Top-K 확장 지원.
+
+### 6.3 GRPO 구현 비교 (DeepInnovator vs OpenClaw-RL)
+
+| 측면 | OpenClaw-RL | DeepInnovator |
+|------|------------|--------------|
+| Advantage 계산 | r 직접 브로드캐스트 (A_t = r) | (score - group_mean) / group_std |
+| 보상 정규화 | 없음 (--disable-rewards-normalization) | 그룹 내 상대적 정규화 |
+| 클리핑 | 비대칭 [0.8, 1.28] (Dr.GRPO 변형) | 표준 대칭 |
+| 신호 출처 | 다음 대화 상태 (PRM) | Authenticity Discriminator |
+
+두 구현 모두 "GRPO"이지만 알고리즘 세부사항이 다름 → MEMORY.md "GRPO variant confusion" 경고 참조.
+
+### 6.4 3개 도구 비교 매트릭스
+
+| 항목 | DeepInnovator | Autoresearch | OpenClaw-RL |
+|------|--------------|--------------|-------------|
+| **학습 목표** | 연구 아이디어 생성 | ML 모델 성능 개선 | 대화형 에이전트 개인화 |
+| **RL 알고리즘** | GRPO + Delta Reward | 없음 (Git 상태 기반) | GRPO (Binary) + OPD |
+| **보상 신호** | Authenticity Discriminator | val_bpb 메트릭 | 다음 사용자 메시지 (PRM) |
+| **에이전트 수** | 7개 (계층 파이프라인) | 1개 (단일 루프) | 4 컴포넌트 (비동기) |
+| **병렬화** | Step 3 병렬 가능 | 순차 | 전체 파이프라인 완전 분리 |
+| **비용 제한** | 없음 | 5분 고정 예산 | 없음 (자체 인프라) |
+| **신규 패턴** | R1-R5 | R3 | R6-R8 |
+
+## 7. Claw 패턴 매핑
 
 기존 9개 런타임 분석에서 추출된 패턴이 연구 도구에 어떻게 적용/변형되는지 분석한다.
 
-### 6.1 Memory 패턴
+### 7.1 Memory 패턴
 
 #### DeepInnovator JSON 계층 vs Claw Memory Tiers
 
@@ -461,7 +523,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 **발견**: 두 시스템 모두 **Git을 상태 관리 시스템으로 활용**. Autoresearch는 "코드 상태"를, ZeroClaw는 "기억 상태"를 Git으로 추적. **연구 에이전트는 두 가지를 결합**해야 한다: 코드 버전 + 연구 맥락 버전.
 
-### 6.2 Tool 패턴
+### 7.2 Tool 패턴
 
 #### VERL Tools vs MCP 표준
 
@@ -479,7 +541,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 **idea3/idea4 시사점**: DeepInnovator의 MCP 통합 + Autoresearch의 단순성을 결합. 핵심 도구만 MCP로 (논문 검색, 메모리), 나머지는 LLM 직접 처리.
 
-### 6.3 Context 패턴: program.md vs SKILL.md vs HAND.toml
+### 7.3 Context 패턴: program.md vs SKILL.md vs HAND.toml
 
 | 측면 | program.md (Autoresearch) | SKILL.md (OpenFang Skills) | HAND.toml (OpenFang Hands) |
 |------|--------------------------|---------------------------|---------------------------|
@@ -514,7 +576,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 [RESEARCH_SNAPSHOT.md 자동 생성 + Git 추적]
 ```
 
-### 6.4 Security 패턴
+### 7.4 Security 패턴
 
 #### prepare.py 읽기전용 = IronClaw Capability Attenuation
 
@@ -543,9 +605,9 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 ---
 
-## 7. idea3/idea4 설계 시사점
+## 8. idea3/idea4 설계 시사점
 
-### 7.1 두 도구에서 추출한 신규 패턴
+### 8.1 두 도구에서 추출한 신규 패턴
 
 #### 패턴 R1: Authenticity Discriminator (DeepInnovator)
 
@@ -590,7 +652,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 **idea3/idea4 적용**: Literature Review Agent의 프롬프트에 동일 원칙 적용. "논문 A와 B를 그냥 나열하지 말고, 둘의 방법론이 어떻게 상호 보완되는지 설명하라."
 
-### 7.2 기존 Claw 패턴 + 연구 도구 패턴 결합
+### 8.2 기존 Claw 패턴 + 연구 도구 패턴 결합
 
 | 기능 | Claw 패턴 | 연구 도구 패턴 | 결합 |
 |------|----------|--------------|------|
@@ -602,7 +664,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 | **검증** | 없음 | Discriminator + val_bpb | 연구 품질 자동 검증 레이어 |
 | **병렬** | PicoClaw goroutine | Step 3 병렬 | 논문 분석 병렬 + 통찰 생성 병렬 |
 
-### 7.3 연구 에이전트 최적 스택 제안
+### 8.3 연구 에이전트 최적 스택 제안
 
 ```
 +---------------------------------------------------+
@@ -626,9 +688,9 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 ---
 
-## 8. 결론 및 신규 오픈 퀘스천
+## 9. 결론 및 신규 오픈 퀘스천
 
-### 8.1 핵심 결론
+### 9.1 핵심 결론
 
 1. **DeepInnovator와 Autoresearch는 상호 보완적**: DeepInnovator는 "어떤 아이디어를 추구할 것인가"(방향), Autoresearch는 "아이디어를 어떻게 검증할 것인가"(실행). 연구 에이전트는 양쪽 모두 필요.
 
@@ -646,7 +708,7 @@ def evaluate_bpb(model, tokenizer, batch_size):
 
 4. **"Research Instruction Document" 제안**: program.md(루프) + HAND.toml(도구/권한) + ZeroClaw(기억 스냅샷)을 결합한 새로운 에이전트 지시 형식.
 
-### 8.2 신규 오픈 퀘스천
+### 9.2 신규 오픈 퀘스천
 
 **Q21. Authenticity Discriminator의 한계는?**
 - 형식이 아닌 내용 품질을 평가한다고 하지만, LLM 판사(judge) 자체의 편향은?

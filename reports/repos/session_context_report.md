@@ -1,7 +1,7 @@
 # Claw 에이전트 런타임의 세션/컨텍스트 관리 전략 비교 분석
 
-> **조사 일자**: 2026-03-04 (OpenJarvis 추가: 2026-03-14)
-> **조사 방법**: 7개 에이전트가 각 레포의 실제 소스코드를 병렬로 심층 분석 (OpenJarvis 별도 추가)
+> **조사 일자**: 2026-03-04 (OpenJarvis 추가: 2026-03-14, OpenFang/NemoClaw 추가: 2026-03-17)
+> **조사 방법**: 7개 에이전트가 각 레포의 실제 소스코드를 병렬로 심층 분석 (OpenJarvis, OpenFang, NemoClaw 별도 추가)
 > **핵심 질문**: "24시간 상주하는 대화형 에이전트가 복잡한 멀티스텝 작업을 수행할 때, 세션과 컨텍스트를 어떻게 관리하는가?"
 
 ---
@@ -27,13 +27,14 @@
 
 ## 1. Executive Summary
 
-7개 Claw 구현체의 소스코드를 분석한 결과, 세션/컨텍스트 관리 전략은 크게 **3가지 아키타입**으로 수렴한다:
+10개 Claw 구현체의 소스코드를 분석한 결과, 세션/컨텍스트 관리 전략은 크게 **4가지 아키타입**으로 수렴한다:
 
 | 아키타입 | 구현체 | 핵심 원리 |
 |----------|--------|-----------|
-| **A. 프로세스/컨테이너 격리** | NanoClaw, TinyClaw | 컨텍스트 경계 = OS 프로세스/컨테이너 경계 |
+| **A. 프로세스/컨테이너 격리** | NanoClaw, TinyClaw, **OpenFang** | 컨텍스트 경계 = OS 프로세스/컨테이너 경계. OpenFang은 프로세스 격리 + Soul Snapshot 24/7 지속성 추가 |
 | **B. 세션 키 기반 논리적 격리** | OpenClaw, Nanobot, PicoClaw, ZeroClaw, OpenJarvis | 세션 키로 대화 히스토리를 논리적으로 분리 |
 | **C. 보안 계층 기반 격리** | IronClaw | WASM 샌드박스 + 프록시 + 암호화 볼트로 다층 격리 |
+| **D. 컨테이너 격리 (샌드박스 플러그인)** | **NemoClaw** | Docker 샌드박스 수명주기(생성/연결/파괴) + 마이그레이션 상태 머신. 호스트(OpenClaw)의 에이전트 시스템에 의존 |
 
 **가장 주목할 발견**: 어떤 구현체도 idea.md가 제시한 "메일 읽기 → 일정 확인 → 주간 계획 수립"과 같은 **이종 작업 간 자동 컨텍스트 분리**를 완전히 해결하지 못했다. 현재 가장 가까운 해법은 OpenClaw의 서브에이전트 시스템이지만, 이는 에이전트가 스스로 `sessions_spawn` 도구를 호출해야 하며, "이 작업은 별도 컨텍스트가 필요하다"는 판단을 LLM에 의존한다.
 
@@ -53,6 +54,8 @@
 | **PicoClaw** | `agent:<id>:<channel>:<kind>:<peer>` | JSON 파일 (atomic write) | 채널-피어 단위 격리 |
 | **TinyClaw** | `agent_dir` 경로 | 파일시스템 디렉토리 | 에이전트별 디렉토리 격리 |
 | **OpenJarvis** | `session_id` (SQLite) | SQLite SessionStore | cross-channel 논리적 격리 (SessionIdentity) |
+| **OpenFang** | 채널별 세션 + per-channel 모델 오버라이드 | Soul Snapshot (마크다운) + 내부 DB | 프로세스 격리 + Soul Snapshot 24/7 지속성 |
+| **NemoClaw** | 샌드박스 수명주기 (생성/연결/파괴) | 마이그레이션 스냅샷 (tar archive) | Docker 컨테이너 격리 + blueprint 버전 관리 |
 
 ### 2.2 서브에이전트/멀티에이전트 지원
 
@@ -66,6 +69,8 @@
 | **PicoClaw** | 없음 (단일 에이전트 루프) | 50회 도구 반복 | N/A |
 | **TinyClaw** | 분산 액터 모델 (팀 멤버 간 멘션) | 팀 크기 제한 없음 | SQLite 메시지 큐 (`conversation_id`) |
 | **OpenJarvis** | OrchestratorAgent (LoopGuard) | N/A | 시스템 메시지 주입 |
+| **OpenFang** | Hands 시스템 + A2A 프로토콜 (멀티에이전트) | 설정 가능 | A2A 표준 메시지 교환 |
+| **NemoClaw** | OpenClaw 에이전트 시스템에 위임 | OpenClaw 제한 따름 | OpenClaw 내부 메시지 시스템 |
 
 ### 2.3 컨텍스트 윈도우 관리 (컴팩션/요약)
 
@@ -79,6 +84,8 @@
 | **PicoClaw** | 20개 메시지 or 토큰 75% 초과 | 2-pass 요약 (분할→각각 요약→LLM 병합), 최근 4개 보존 | MEMORY.md + 최근 3일 daily notes |
 | **TinyClaw** | Claude `-c` 플래그 (세션 연속) | SDK 자체 관리 | 에이전트별 AGENTS.md |
 | **OpenJarvis** | consolidation_threshold: 100 메시지 (Nanobot과 동일) | LoopGuard 반복 탐지 → 컨텍스트 압축; RLM Agent: Python REPL 변수로 저장 | SQLite 세션 저장소 |
+| **OpenFang** | Soul Snapshot 24/7 지속성 기반 | per-channel 모델 오버라이드 + Soul Snapshot 자동 재개 | Knowledge Graph + SQLite BLOB (importance scoring) |
+| **NemoClaw** | OpenClaw 의존 | 마이그레이션 상태 머신 (host → sandbox 이전) | OpenClaw 컨텍스트 관리 위임 + blueprint 캐시 |
 
 ---
 
@@ -271,6 +278,42 @@ repl.exec(f"document = {repr(long_document)}")
 
 ---
 
+### 3.9 OpenFang — Soul Snapshot 24/7 + per-channel 모델 오버라이드
+
+**핵심 패턴: 프로세스 격리 + Soul Snapshot 지속성 + Hands 시스템 멀티에이전트**
+
+OpenFang은 24/7 자율 실행을 전제로 설계된 프레임워크로, Soul Snapshot을 통한 세션 간 에이전트 정체성 연속성이 핵심이다.
+
+**3-layer 컨텍스트 윈도우**: 시스템 프롬프트(12-section 빌더) + 대화 히스토리 + 도구 결과. 12-section 빌더는 채널 유형, 에이전트 역할, 메모리 상태 등을 구조적으로 조합해 시스템 프롬프트를 동적 생성.
+
+**per-channel 모델 오버라이드**: 채널별로 다른 LLM 모델 지정 가능. DM은 claude-opus, 그룹 채팅은 claude-haiku 등 컨텍스트 요구에 맞는 모델 선택.
+
+**Soul Snapshot 재개**: 재시작 시 Soul Snapshot에서 에이전트 정체성과 핵심 기억 자동 복원. ZeroClaw의 cold-boot hydration 패턴과 동일하나, OpenFang은 Capability 시스템과 통합.
+
+**Hands 시스템 + A2A 프로토콜**: 플러그인 생태계(Hands)로 멀티에이전트 오케스트레이션. Google A2A spec 지원으로 타 프레임워크 에이전트와 표준화된 통신.
+
+**주요 코드**: `crates/context/src/builder.rs` (12-section builder), `crates/memory/src/snapshot.rs` (Soul Snapshot), `crates/hands/src/lib.rs` (플러그인 시스템)
+
+---
+
+### 3.10 NemoClaw — 샌드박스 수명주기 + 마이그레이션 상태 머신
+
+**핵심 패턴: Docker 샌드박스 생성/연결/파괴 + 마이그레이션 스냅샷 + OpenClaw 에이전트 위임**
+
+NemoClaw는 세션/컨텍스트 관리를 직접 구현하지 않고 OpenClaw 호스트에 위임하는 "샌드박스 플러그인"이다. 고유한 기여는 샌드박스 수명주기 관리와 마이그레이션 상태 머신.
+
+**샌드박스 수명주기**: `launch → connect → migrate → eject → destroy` 5단계 상태 머신. 각 단계는 blueprint 버전으로 관리되어 환경 재현성 보장.
+
+**마이그레이션 상태 머신 (host → sandbox)**: 호스트에서 실행 중인 OpenClaw 에이전트를 샌드박스 컨테이너로 이전하는 고유 패턴. tar 아카이브 스냅샷으로 런 상태 보존 후 컨테이너 내부에서 복원.
+
+**blueprint 버전 관리**: 10개 네트워크 정책 프리셋(커넥터)을 blueprint로 선택. blueprint가 컨테이너 환경을 정의하므로, 같은 blueprint로 동일한 샌드박스를 언제든 재현 가능.
+
+**OpenClaw 에이전트 위임**: 컨텍스트 윈도우, 대화 히스토리, 기억 관리는 모두 OpenClaw 내부에서 처리. NemoClaw는 이 모든 것을 투명하게 샌드박스 컨테이너 안에서 실행되도록 래핑.
+
+**주요 코드**: `nemoclaw/sandbox/lifecycle.py` (샌드박스 수명주기), `nemoclaw/migration/state.py` (마이그레이션 상태 머신), `nemoclaw/blueprint/` (환경 정의)
+
+---
+
 ## 4. 핵심 설계 패턴 5가지
 
 ### 패턴 1: "세션 키가 세계를 정의한다"
@@ -286,6 +329,8 @@ NanoClaw:   group_folder                       → 그룹(채팅방) 격리
 TinyClaw:   agent_dir path                     → 에이전트 디렉토리 격리
 ZeroClaw:   session_id (DB column)             → DB 레코드 격리
 OpenJarvis: session_id + channel_ids dict      → DB 레코드 격리 + cross-channel 통합
+OpenFang:   channel + per-channel model config → 채널 격리 + 모델 오버라이드 통합
+NemoClaw:   sandbox_id + blueprint_version     → 컨테이너 격리 + 환경 버전 관리
 ```
 
 **OpenJarvis의 혁신**: 세션 키가 단순한 "격리 단위"를 넘어 "통합 단위"로 기능한다. `channel_ids: {"slack": "U12345", "telegram": "@user"}` 구조로 여러 채널의 동일 사용자를 하나의 세션에 묶는다. 다른 구현체들의 세션 키가 분리를 위한 키라면, OpenJarvis의 SessionIdentity는 연결을 위한 키다.
@@ -394,6 +439,8 @@ IronClaw만이 이 문제를 체계적으로 해결했다:
 | 멀티에이전트 협업 | 메시지 큐 + 액터 모델 | TinyClaw (SQLite 큐 + Promise 체인) |
 | **cross-channel 세션 연속성** | SessionIdentity channel_ids dict | **OpenJarvis** (Slack+Telegram+Web 통합) |
 | **컨텍스트 윈도우 초과 (대형 문서)** | Python REPL 변수 외재화 (RLM) | **OpenJarvis** (Context-as-Variable) |
+| **24/7 에이전트 정체성 연속성** | Soul Snapshot + per-channel 모델 오버라이드 | **OpenFang** (재시작 후 자동 복원 + 채널별 최적 모델) |
+| **기존 에이전트의 안전한 샌드박스 이전** | 마이그레이션 상태 머신 + blueprint 버전 관리 | **NemoClaw** (host→sandbox 이전 + 환경 재현성) |
 
 ### 아직 풀리지 않은 문제
 
@@ -409,4 +456,4 @@ IronClaw만이 이 문제를 체계적으로 해결했다:
 
 ---
 
-> **최종 요약**: idea.md의 핵심 통찰은 정확했다. "이게 다야"라는 아키텍처 원형 분석도, "세션과 컨텍스트 관리가 진짜 쟁점"이라는 문제 정의도 코드 레벨에서 검증된다. 8개 구현체 모두 이 문제에 코드의 1/4~2/5를 투자하고 있으며, 각자 다른 트레이드오프를 선택했다. OpenJarvis는 두 가지 새로운 방향을 제시했다: (1) 세션을 "격리 단위"가 아닌 "cross-channel 통합 단위"로 재정의하는 SessionIdentity, (2) 컨텍스트를 압축하는 대신 Python REPL 변수로 외재화하는 RLM Context-as-Variable. 그러나 "자동 컨텍스트 분리 판단"이라는 핵심 문제는 아직 어느 구현체도 프레임워크 레벨에서 해결하지 못했다.
+> **최종 요약**: idea.md의 핵심 통찰은 정확했다. "이게 다야"라는 아키텍처 원형 분석도, "세션과 컨텍스트 관리가 진짜 쟁점"이라는 문제 정의도 코드 레벨에서 검증된다. 10개 구현체 모두 이 문제에 코드의 1/4~2/5를 투자하고 있으며, 각자 다른 트레이드오프를 선택했다. OpenJarvis는 두 가지 새로운 방향을 제시했다: (1) 세션을 "격리 단위"가 아닌 "cross-channel 통합 단위"로 재정의하는 SessionIdentity, (2) 컨텍스트를 압축하는 대신 Python REPL 변수로 외재화하는 RLM Context-as-Variable. OpenFang은 Soul Snapshot 24/7 지속성과 per-channel 모델 오버라이드로 "24시간 에이전트 정체성 연속성" 문제에 가장 직접적인 답을 제시했다. NemoClaw는 "기존 에이전트를 안전하게 샌드박스로 이전"하는 마이그레이션 상태 머신으로 독자적 문제를 해결했다. 그러나 "자동 컨텍스트 분리 판단"이라는 핵심 문제는 아직 어느 구현체도 프레임워크 레벨에서 해결하지 못했다.

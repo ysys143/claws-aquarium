@@ -55,7 +55,6 @@ OpenFang은 스스로를 **"Agent OS"**라고 명명한다. 137K LOC, 14개 Rust
 | Nanobot | 9+MCP | Tier 3 | Tier 2 (MEMORY.md+HISTORY.md) | 없음 | 다수 |
 | NanoClaw | 10 IPC | Tier 2 | Tier 3 (CLAUDE.md 위임) | Playwright (HOST) | 0 |
 | TinyClaw | 0 native | Tier 4 | Tier 3 (write-only) | 없음 | 0 |
-| Moltbook | 32 endpoints | Tier 4 | Tier 3 (없음) | 없음 | 0 |
 
 ### 2.2 고유 기능 비교
 

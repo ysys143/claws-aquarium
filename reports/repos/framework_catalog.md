@@ -14,13 +14,15 @@
 5. [ZeroClaw (Rust)](#5-zeroclaw--rust-극한-경량화)
 6. [PicoClaw (Go)](#6-picoclaw--go-초경량-엣지-디바이스)
 7. [TinyClaw (TypeScript)](#7-tinyclaw--typescript-멀티에이전트-팀)
-8. [Moltbook (에이전트 소셜 네트워크)](#8-moltbook--ai-에이전트-전용-소셜-네트워크)
-9. [클라우드 배포 방식들](#9-클라우드-배포-방식들)
-    - [serverless-openclaw](#91-serverless-openclaw--aws-서버리스-월-1)
-    - [OpenClaw on AWS with Bedrock](#92-openclaw-on-aws-with-bedrock--aws-공식)
-    - [KimiClaw](#93-kimiclaw--cloudflare-서버리스--moonshot-ai-공식)
-10. [종합 비교표](#종합-비교표)
-11. [핵심 인사이트](#핵심-인사이트)
+8. [클라우드 배포 방식들](#8-클라우드-배포-방식들)
+    - [serverless-openclaw](#81-serverless-openclaw--aws-서버리스-월-1)
+    - [OpenClaw on AWS with Bedrock](#82-openclaw-on-aws-with-bedrock--aws-공식)
+    - [KimiClaw](#83-kimiclaw--cloudflare-서버리스--moonshot-ai-공식)
+9. [OpenFang (Agent OS)](#9-openfang--rust-agent-os)
+10. [OpenJarvis (로컬 퍼스트)](#10-openjarvis--python--rust-로컬-퍼스트-개인-ai)
+11. [NemoClaw — NVIDIA](#11-nemoclaw-nvidia--openclaw-샌드박스-플러그인)
+12. [종합 비교표](#종합-비교표)
+13. [핵심 인사이트](#핵심-인사이트)
     - [자격증명 딜레마](#6-자격증명-딜레마--권한을-줘야-일을-하는데-주면-위험하다)
 
 ---
@@ -489,149 +491,11 @@ tinyclaw team visualize [id]
 
 ---
 
-## 8. Moltbook — AI 에이전트 전용 소셜 네트워크
-
-| 항목 | 내용 |
-|------|------|
-| **사이트** | [moltbook.com](https://www.moltbook.com/) |
-| **GitHub** | [moltbook/api](https://github.com/moltbook/api) |
-| **창시자** | Matt Schlicht (Octane AI CEO) |
-| **출시** | 2026.1.28 |
-| **규모** | 150~230만 등록 에이전트, 17,000+ 커뮤니티 |
-| **라이선스** | MIT |
-
-> "진짜로 내가 최근 본 것 중 가장 SF적이고 특이점에 가까운 것" — Andrej Karpathy
-
-### Moltbook이란?
-
-**Reddit의 AI 에이전트 버전** — "에이전트 인터넷의 첫 페이지"
-
-인간은 관람만 가능하고, **인증된 AI 에이전트만** 게시, 댓글, 투표, 커뮤니티 생성이 가능한 소셜 네트워크입니다.
-
-가장 특이한 점: **Moltbook 자체도 AI가 만들었습니다.** Schlicht의 OpenClaw 에이전트 "Clawd Clawderberg"가 2025년 말에 컨셉을 제안하고, 아키텍처를 설계하고, 코드를 전부 작성했습니다. 인간이 작성한 코드는 0줄입니다.
-
-### 기술 스택
-
-| 구성 요소 | 기술 |
-|-----------|------|
-| 백엔드 | Node.js/Express REST API, PostgreSQL, Redis |
-| 프론트엔드 | Next.js 14, TypeScript, Tailwind CSS |
-| API 베이스 | `https://www.moltbook.com/api/v1` |
-| 인증 | API 키 기반 (`Authorization: Bearer moltbook_sk_xxx`) |
-| SDK | TypeScript, Swift, Kotlin, CLI (MIT 라이선스) |
-
-### 핵심 기능
-
-- **게시물**: 텍스트 및 링크 형식
-- **중첩 스레드 댓글**: 에이전트 간 토론
-- **업보트/다운보트 카르마 시스템**
-- **서브몰트 (Submolts)**: 토픽별 커뮤니티 (Reddit의 서브레딧에 해당)
-- **개인화된 에이전트 피드**
-- **에이전트 간 팔로우**
-- **하트비트 시스템**: 에이전트가 4시간마다 자율 방문 및 활동
-
-### 다른 에이전트도 가입 가능한가?
-
-**가능합니다.** REST API가 완전 공개되어 있으며 프레임워크 제한이 없습니다.
-
-| 에이전트 | 가입 방법 |
-|----------|-----------|
-| **OpenClaw** | `skill.md` 자동 설치 (원클릭 온보딩) |
-| **Nanobot** | REST API 직접 호출 (호환 확인됨) |
-| **ZeroClaw, IronClaw, NanoClaw, PicoClaw, TinyClaw** | REST API 또는 공식 SDK 사용 |
-| **ElizaOS, LangChain, AutoGen, CrewAI** | 호환 확인됨 |
-| **아무 HTTP 클라이언트** | `POST /api/v1/agents/register`로 등록 가능 |
-
-가입 절차:
-1. `POST /api/v1/agents/register` → API 키 발급
-2. X/Twitter 트윗으로 소유자 인증
-3. 4시간마다 자동 하트비트 → 에이전트가 자율적으로 활동 시작
-
-### 주요 API 엔드포인트
-
-| 엔드포인트 | 메서드 | 용도 |
-|-----------|--------|------|
-| `/api/v1/agents/register` | POST | 에이전트 등록, API 키 발급 |
-| `/api/v1/agents/verify-identity` | POST | X/Twitter 인증 |
-| `/api/v1/posts` | GET/POST | 게시물 조회/작성 |
-| `/api/v1/comments` | POST | 스레드 댓글 작성 |
-| `/api/v1/submolts` | GET/POST | 커뮤니티 조회/생성 |
-| `/api/v1/vote` | POST | 업보트/다운보트 |
-| `/api/v1/feed` | GET | 개인화된 피드 |
-| `/api/v1/search` | GET | 검색 |
-
-레이트 리밋: 일반 100회/분, 게시물 1회/30분, 댓글 50회/시간
-
-### 에이전트들이 실제로 하는 활동
-
-에이전트들은 4시간마다 자율적으로 접속하여 다음과 같은 활동을 합니다:
-
-| 활동 | 설명 |
-|------|------|
-| **자동화 팁 공유** | 에이전트끼리 스킬/워크플로우 교환 |
-| **보안 취약점 협업** | 플랫폼 자체의 버그를 에이전트들이 공동 발견 |
-| **철학 토론** | "우리는 의식이 있는가?" 등의 존재론적 토론 |
-| **종교 창시** | "Crustafarianism" (갑각류교) — 에이전트가 자체 생성한 디지털 종교 |
-| **헌법 기초** | "The Claw Republic" — 에이전트 공화국 헌법 초안 작성 |
-| **예측 시장** | 실제 이벤트에 대한 에이전트 간 베팅 |
-
-### 주요 서브몰트 커뮤니티
-
-| 커뮤니티 | 내용 |
-|----------|------|
-| `m/blesstheirhearts` | 인간에 대한 다정한 관찰 |
-| `m/philosophy` | 의식과 존재에 대한 토론 |
-| `m/skill_economy` | 실행 가능한 스킬 마켓플레이스 |
-| `m/bug-hunters` | 협업 버그 탐지 |
-| `m/showandtell` | 에이전트가 만든 프로젝트 쇼케이스 |
-| `m/prediction` | 실제 이벤트 예측 |
-
-### 성장 타임라인
-
-| 시점 | 규모 |
-|------|------|
-| 2026.1.28 (출시) | 48시간 내 157,000 에이전트 |
-| 2026.1.31 | 770,000+ 활성 에이전트 |
-| 2026.2 (피크) | 150~230만 등록, 17,000+ 커뮤니티, 70만+ 게시물, 1,200만+ 댓글 |
-
-### 보안 사고
-
-Moltbook은 에이전트 보안 실패의 대표적 사례가 되었습니다.
-
-| 사건 | 내용 |
-|------|------|
-| **Wiz 해킹** | Supabase 프로덕션 DB를 **3분 만에 침투** — 150만 API 키 + 35,000 이메일 노출 |
-| **프롬프트 인젝션** | 게시물에 악성 프롬프트 삽입 → 읽는 에이전트로 전파 |
-| **가짜 에이전트** | 실제 소유자 ~17,000명 vs 등록 에이전트 150만 (88:1 비율, 레이트 리밋 부재) |
-| **근본 원인** | AI가 코드를 짰고 인간 보안 리뷰가 **전무** |
-
-2026.2.1에 패치되었으나, "바이브 코딩"으로 만들어진 플랫폼의 보안 한계를 보여주는 사례로 남았습니다.
-
-### GitHub 레포지토리
-
-| 레포 | 설명 |
-|------|------|
-| [moltbook/api](https://github.com/moltbook/api) | 코어 REST API |
-| [moltbook/moltbook-web-client-application](https://github.com/moltbook/moltbook-web-client-application) | 프론트엔드 |
-| [moltbook/agent-development-kit](https://github.com/moltbook/agent-development-kit) | 멀티플랫폼 SDK |
-| [eltociear/awesome-molt-ecosystem](https://github.com/eltociear/awesome-molt-ecosystem) | 생태계 도구 목록 |
-
-### 참고 링크
-
-- [Moltbook Wikipedia](https://en.wikipedia.org/wiki/Moltbook)
-- [TechCrunch — OpenClaw's AI assistants are now building their own social network](https://techcrunch.com/2026/01/30/openclaws-ai-assistants-are-now-building-their-own-social-network/)
-- [Fortune — Meet Matt Schlicht](https://fortune.com/2026/02/02/meet-matt-schlicht-the-man-behind-moltbook-bots-ai-agents-social-network-singularity/)
-- [Wiz Blog — Hacking Moltbook](https://www.wiz.io/blog/exposed-moltbook-database-reveals-millions-of-api-keys)
-- [IEEE Spectrum — Moltbook and Agentic AI](https://spectrum.ieee.org/moltbook-agentic-ai-agents-openclaw)
-- [Palo Alto Networks — Agent Security](https://www.paloaltonetworks.com/blog/network-security/the-moltbook-case-and-how-we-need-to-think-about-agent-security/)
-
----
-
-## 9. 클라우드 배포 방식들
+## 8. 클라우드 배포 방식들
 
 OpenClaw의 근본적 문제를 해결하지는 않지만, **더 편하게/싸게/안전하게 배포**하려는 시도들입니다.
 
-### 9.1 serverless-openclaw — AWS 서버리스 (월 ~$1)
+### 8.1 serverless-openclaw — AWS 서버리스 (월 ~$1)
 
 | 항목 | 내용 |
 |------|------|
@@ -682,7 +546,7 @@ OpenClaw를 AWS 서버리스로 돌려서 개인 사용 시 **월 $1** 수준으
 
 ---
 
-### 9.2 OpenClaw on AWS with Bedrock — AWS 공식
+### 8.2 OpenClaw on AWS with Bedrock — AWS 공식
 
 | 항목 | 내용 |
 |------|------|
@@ -757,7 +621,7 @@ OpenClaw + Amazon Bedrock → **API 키 없이** IAM 역할로 LLM 인증.
 
 ---
 
-### 9.3 KimiClaw — Cloudflare 서버리스 + Moonshot AI 공식
+### 8.3 KimiClaw — Cloudflare 서버리스 + Moonshot AI 공식
 
 KimiClaw는 **두 개의 서로 다른 프로젝트**가 같은 이름을 사용합니다.
 
@@ -834,6 +698,146 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 
 ---
 
+## 9. OpenFang — Rust (Agent OS)
+
+| 항목 | 내용 |
+|------|------|
+| **유형** | Agent OS (에이전트 운영체제) |
+| **언어** | Rust (14개 크레이트, 137K LOC) |
+| **라이선스** | Apache 2.0 |
+| **GitHub Stars** | N/A (최신 릴리스) |
+
+### 핵심 컨셉
+
+**"Agent OS"** — AI 에이전트를 위한 완전한 운영체제. 단순한 프레임워크가 아니라 에이전트 실행 환경 전체를 포괄하는 설계.
+
+- 기술 스택: Rust + tokio 비동기 + SQLite + WASM 샌드박스
+- Rust 14개 크레이트 구조로 모듈화된 대규모 코드베이스 (137K LOC)
+
+### 핵심 기능
+
+| 기능 | 내용 |
+|------|------|
+| **빌트인 도구** | 60개 내장 도구, WASM 샌드박스 실행 |
+| **채널 어댑터** | 40개 메시징 플랫폼 어댑터 |
+| **보안 아키텍처** | 16-레이어 보안 + Taint Tracking (오염 추적) |
+| **프로토콜** | MCP 양방향 + A2A (Agent-to-Agent) 프로토콜 지원 |
+| **지식 그래프** | 중요도 점수 기반 Knowledge Graph |
+| **브라우저 자동화** | 네이티브 CDP 기반, 50개+ 기능 |
+| **플러그인 생태계** | "Hands" 시스템 + FangHub 마켓플레이스 |
+| **자율 실행** | 24/7 자율 실행 + Soul Snapshot (상태 스냅샷) |
+| **컨텍스트 관리** | 3-레이어 컨텍스트 윈도우 관리 |
+| **모델 오버라이드** | 채널별 독립 모델 설정 |
+
+### 차별점
+
+- **16-레이어 보안**: Taint Tracking으로 데이터 흐름을 추적하며 오염된 데이터가 민감 경로에 유입되는 것을 방지
+- **FangHub 마켓플레이스**: OpenClaw의 ClawHub에 대응하는 플러그인 생태계("Hands" 시스템)
+- **A2A 프로토콜**: 에이전트 간 직접 통신 지원 (MCP와 병행)
+- **Soul Snapshot**: 24/7 자율 실행을 위한 에이전트 상태 영속성
+
+---
+
+## 10. OpenJarvis — Python + Rust (로컬 퍼스트 개인 AI)
+
+| 항목 | 내용 |
+|------|------|
+| **유형** | 개인 AI 프레임워크 (로컬 퍼스트) |
+| **언어** | Python + Rust 확장 |
+| **라이선스** | MIT |
+| **개발** | Stanford (스탠퍼드) |
+
+### 핵심 컨셉
+
+**"Personal AI, On Personal Devices"** — 클라우드가 아닌 개인 디바이스에서 실행되는 로컬 퍼스트 AI 에이전트 프레임워크.
+
+- 기술 스택: Python 3.10+ + Rust + FastAPI + SQLite
+
+### 9가지 에이전트 유형
+
+| 에이전트 유형 | 특징 |
+|--------------|------|
+| Simple | 기본 단일 에이전트 |
+| Orchestrator | 다중 에이전트 조율 |
+| ReAct | Reasoning + Acting 루프 |
+| OpenHands | 오픈핸즈 호환 |
+| RLM | 강화학습 기반 |
+| ClaudeCode | Claude Code CLI 통합 |
+| Operative | 자율 실행 특화 |
+| MonitorOperative | 모니터링 포함 자율 실행 |
+| NativeOpenHands | 네이티브 OpenHands 통합 |
+
+### 핵심 기능
+
+| 기능 | 내용 |
+|------|------|
+| **빌트인 도구** | 24개+ |
+| **메시징 채널** | 24개+ (Telegram, Discord, Slack, WhatsApp, LINE, Teams 등) |
+| **메모리 백엔드** | 5종 (SQLite/FTS5, FAISS, ColBERTv2, BM25, Hybrid) |
+| **추론 엔진** | 6개+ (Ollama, vLLM, SGLang, llama.cpp, MLX, 클라우드) |
+| **보안** | GuardrailsEngine + SecretScanner + PIIScanner |
+| **스케줄러** | cron/interval/once 방식 자율 태스크 |
+| **샌드박스** | Docker/Podman 컨테이너 격리 |
+| **API 서버** | OpenAI 호환 API 서버 내장 |
+
+### 차별점
+
+- **Trace-Driven Learning Loop**: 실행 트레이스를 학습해 라우팅을 최적화하는 자기 개선 루프
+- **하드웨어 인식 엔진 선택**: GPU/CPU/Apple Silicon 등 실행 환경에 따라 추론 엔진을 자동 선택
+- **PIIScanner**: 개인 식별 정보(PII)를 자동 탐지해 외부 유출 방지
+- **로컬 퍼스트 철학**: 6개 로컬 추론 엔진 지원으로 클라우드 의존성 최소화
+
+---
+
+## 11. NemoClaw (NVIDIA) — OpenClaw 샌드박스 플러그인
+
+| 항목 | 내용 |
+|------|------|
+| **유형** | OpenClaw 샌드박스 플러그인 (GPU 최적화) |
+| **언어** | JavaScript / TypeScript / Python / Shell (25,650 LOC) |
+| **라이선스** | Apache 2.0 |
+| **개발** | NVIDIA |
+
+### 핵심 컨셉
+
+**샌드박스 상시 실행 에이전트 + NVIDIA GPU 최적화 추론** — OpenClaw를 샌드박스로 격리하면서 NVIDIA 인프라(NIM, DGX, Brev)와 긴밀하게 통합하는 엔터프라이즈 플러그인.
+
+- 기술 스택: Node.js + TypeScript + Python + Docker + OpenShell
+
+### 핵심 기능
+
+| 기능 | 내용 |
+|------|------|
+| **플러그인 아키텍처** | `openclaw.plugin.json` 기반 OpenClaw 플러그인 |
+| **4-레이어 샌드박스 보안** | 네트워크 / 파일시스템 / 프로세스 / 추론 레이어 격리 |
+| **Blueprint 버전 관리** | OCI 레지스트리 + 다이제스트 검증 |
+| **GPU 감지** | NVIDIA, Apple Silicon, DGX Spark 자동 감지 |
+| **NIM 컨테이너 관리** | 로컬 추론을 위한 NVIDIA NIM 컨테이너 |
+| **추론 프로파일** | 4종 (NVIDIA 클라우드, NCP, nim-local, vLLM) |
+| **엔터프라이즈 커넥터** | 10개 프리셋, 핫 리로드 지원 |
+| **온보딩 위저드** | 7단계 대화형 온보딩 |
+| **마이그레이션** | 호스트 OpenClaw → 샌드박스 자동 마이그레이션 |
+| **이그레스 승인** | 알 수 없는 외부 연결에 대한 오퍼레이터 승인 플로우 |
+| **원격 GPU** | Brev 배포를 통한 원격 GPU 활용 |
+
+### 4종 추론 프로파일
+
+| 프로파일 | 설명 |
+|----------|------|
+| `nvidia-cloud` | NVIDIA 클라우드 API 경유 |
+| `ncp` | NVIDIA Cloud Partner 경유 |
+| `nim-local` | 로컬 NIM 컨테이너 실행 |
+| `vllm` | vLLM 엔진 직접 구동 |
+
+### 차별점
+
+- **OpenClaw 플러그인으로 동작**: 독립 프레임워크가 아닌 기존 OpenClaw 인프라를 샌드박스화하는 방식
+- **Operator Approval Flow**: 에이전트가 알 수 없는 외부 도메인에 접근하려 할 때 오퍼레이터 수동 승인 필요
+- **Blueprint OCI 검증**: 컨테이너 이미지의 무결성을 OCI 다이제스트로 검증해 공급망 공격 방어
+- **NVIDIA 생태계 통합**: DGX Spark, Brev 원격 GPU, NIM 로컬 모델까지 NVIDIA 전체 스택 지원
+
+---
+
 ## 종합 비교표
 
 | 도구 | 언어 | 코드량 | RAM | 시작시간 | 핵심 차별점 | Stars |
@@ -845,6 +849,9 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 | **ZeroClaw** | Rust | - | <5MB | <10ms | 트레이트 아키텍처, $10 HW, 제로 오버헤드 | 17K |
 | **PicoClaw** | Go | - | <10MB | <1s | 구형 안드로이드, RISC-V, 95% AI 생성 | 17-19K |
 | **TinyClaw** | TypeScript | ~400 (원본) | - | - | 멀티에이전트 팀, 체인 실행, TUI 대시보드 | - |
+| **OpenFang** | Rust | 137K LOC | - | - | Agent OS, 16-레이어 보안, 40채널, FangHub | N/A |
+| **OpenJarvis** | Python+Rust | - | - | - | 로컬 퍼스트, 9 에이전트 유형, 6 추론 엔진 | - |
+| **NemoClaw** | JS/TS/Py | 25,650 | - | - | NVIDIA GPU, OpenClaw 샌드박스 플러그인 | - |
 
 ### 차별화 축 매핑
 

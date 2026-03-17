@@ -1,7 +1,7 @@
 # 실세계 권한 부여 보안 전략 — 10개 Claw 코드 기반 비교 분석
 
-> **조사 일자**: 2026-03-05 (OpenJarvis 추가: 2026-03-14)
-> **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석 (OpenJarvis는 단독 추가 분석)
+> **조사 일자**: 2026-03-05 (OpenJarvis 추가: 2026-03-14, OpenFang/NemoClaw 추가: 2026-03-17)
+> **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석 (OpenJarvis, OpenFang, NemoClaw는 별도 추가 분석)
 > **핵심 질문**: "에이전트에게 실세계 권한을 안전하게 부여하기 위해 각 프레임워크가 어떤 보안 전략을 채택했는가?"
 
 ---
@@ -19,21 +19,25 @@
 
 ## 1. Executive Summary
 
-10개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
+13개 구현체의 보안/권한 코드를 분석한 결과, **4개의 보안 성숙도 계층**으로 분류된다:
 
 | 계층 | 구현체 | 특징 |
 |------|--------|------|
+| **Tier S: Next-Gen Defense** | **OpenFang** | WASM Dual Metering + 18종 Capability + Taint Tracking + Keyring + HITL 승인 흐름 — 기존 Tier 1을 능가하는 다층 방어 |
 | **Tier 1: Defense-in-Depth** | IronClaw, ZeroClaw | 암호화 볼트 + WASM/Docker 이중 샌드박스 + 다층 인젝션 방어 + HITL 승인 + 비용 제한 |
+| **Tier A+: Sandbox-First** | **NemoClaw** | Docker + Landlock + seccomp + 네임스페이스 격리 + HITL(미지 egress 승인) + 추론 게이트웨이 격리 |
 | **Tier 2: Container-First** | NanoClaw, OpenClaw, **OpenJarvis** | Docker/subprocess 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어. OpenJarvis는 Prompt Injection Scanner 명시적 구현으로 Tier 2 상단에 위치 |
 | **Tier 3: Denylist-Based** | Nanobot, PicoClaw | 정규식 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음 |
 | **Tier 4: Minimal/None** | TinyClaw | 보안 메커니즘 최소 또는 해당 없음 (실험적 용도) |
 
-**가장 주목할 발견 4가지:**
+**가장 주목할 발견 6가지:**
 
-1. **암호화 볼트를 구현한 곳은 IronClaw과 ZeroClaw 뿐이다.** 나머지 8개는 전부 평문 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305.
-2. **Human-in-the-loop를 구현한 곳은 2개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop). 나머지 8개는 에이전트가 도구를 자율 실행.
-3. **프롬프트 인젝션 방어에 전용 레이어를 둔 곳은 IronClaw, ZeroClaw, OpenJarvis 3개뿐이다.** IronClaw는 SafetyLayer 4중 방어, ZeroClaw는 PromptGuard 6패턴 탐지, **OpenJarvis는 10개 프레임워크 중 유일하게 regex 기반 Prompt Injection Scanner를 명시적으로 구현** (4개 위협 수준: LOW/MEDIUM/HIGH/CRITICAL). 나머지는 레이블링(Nanobot) 또는 마커 래핑(OpenClaw) 수준.
-4. **Taint Tracking을 구현한 곳은 OpenJarvis뿐이다 (10개 중 유일).** 4-label 분류(PII/SECRET/USER_PRIVATE/EXTERNAL)와 SINK_POLICY로 데이터 흐름을 제어한다.
+1. **암호화 볼트를 구현한 곳은 IronClaw, ZeroClaw, OpenFang 3개뿐이다.** 나머지 10개는 전부 평문 저장. IronClaw는 AES-256-GCM + OS Keychain, ZeroClaw는 ChaCha20-Poly1305, OpenFang은 OS Keyring 통합 + 암호화 볼트 + 도구별 자격증명 스코핑.
+2. **Human-in-the-loop를 구현한 곳은 4개뿐이다.** IronClaw(도구별 승인), ZeroClaw(3단계 자율성 + E-Stop), OpenClaw(실행 승인 요청), **OpenFang(Capability별 설정 가능 승인 흐름)**, **NemoClaw(미지 egress 요청 운영자 승인)**. 나머지 8개는 에이전트가 도구를 자율 실행.
+3. **프롬프트 인젝션 방어에 전용 레이어를 둔 곳은 IronClaw, ZeroClaw, OpenJarvis, OpenFang 4개뿐이다.** IronClaw는 SafetyLayer 4중 방어, ZeroClaw는 PromptGuard 6패턴 탐지, **OpenJarvis는 regex 기반 Prompt Injection Scanner** (4개 위협 수준: LOW/MEDIUM/HIGH/CRITICAL), **OpenFang은 다층 방어 + Taint Tracking으로 데이터 흐름 추적**. NemoClaw는 추론 게이트웨이 격리로 직접 인터넷 접근 차단.
+4. **Taint Tracking을 구현한 곳은 OpenJarvis와 OpenFang 2개뿐이다.** OpenJarvis는 4-label 분류(PII/SECRET/USER_PRIVATE/EXTERNAL)와 SINK_POLICY, OpenFang은 Taint Tracking이 WASM Capability 시스템과 결합되어 데이터 흐름 제어.
+5. **WASM 샌드박스를 도구 실행에 사용하는 곳은 IronClaw, ZeroClaw, OpenFang 3개뿐이다.** OpenFang의 WASM Dual Metering(CPU 사이클 + 메모리 할당 이중 계량)은 기존 구현 대비 가장 세밀한 자원 제어.
+6. **NemoClaw는 "샌드박스 플러그인" 특화 설계로 Tier A+를 달성한다.** Docker + Landlock MAC + seccomp + 네트워크 네임스페이스의 4중 OS 격리. 자체 메모리/기억 시스템 없이 보안에 집중하는 단일 책임 원칙.
 
 ---
 
@@ -51,6 +55,8 @@
 | **PicoClaw** | AllowFrom + 서브에이전트 spawn 허용목록 + 에이전트 바인딩 | △ (spawn만 제어) | `pkg/tools/spawn.go:78-82` |
 | **TinyClaw** | Pairing 시스템만 | X | `src/lib/pairing.ts:73-81` |
 | **OpenJarvis** | RBAC 10종 (Python+Rust 이중 구현) + Taint Tracking SINK_POLICY | O (도구별 taint label 기반 차단) | RBAC 모듈, `sink_policy.py` |
+| **OpenFang** | 18종 Capability 타입 + Taint Tracking + WASM Dual Metering | O (Capability-gated, 도구별 권한 선언) | `crates/capability/src/lib.rs` |
+| **NemoClaw** | 4-layer 정책 (network/filesystem/process/inference) + binary-scoped 네트워크 규칙 | O (샌드박스 내 모든 도구 실행) | `nemoclaw/policy/`, `nemoclaw/sandbox/` |
 
 ### 2.2 자격증명 관리
 
@@ -64,6 +70,8 @@
 | **PicoClaw** | `auth.json` (평문, 0600) | X | X | env 태그 지원 | `pkg/auth/store.go:41-44` |
 | **TinyClaw** | `settings.json` (평문) | X | X | X (API로 노출) | `lib/setup-wizard.sh:364-386` |
 | **OpenJarvis** | 평문 (환경변수/config) | X | X | Taint Tracking으로 SECRET label 전파 추적 | `taint_tracker.py`, `sink_policy.py` |
+| **OpenFang** | Keyring 통합 + 암호화 볼트 | **O** | **O** (OS Keyring) | 도구별 자격증명 스코핑 (per-tool credential scoping) | `crates/secrets/src/keyring.rs`, `crates/secrets/src/vault.rs` |
+| **NemoClaw** | `~/.nemoclaw/credentials.json` (mode 600) | X | X | OpenShell 주입 방식 (샌드박스 내부에 값 노출 없음) | `nemoclaw/credentials.py` |
 
 ### 2.3 샌드박싱
 
@@ -77,6 +85,8 @@
 | **PicoClaw** | △ (기본 격리만) | X | `os.Root` 기반 샌드박스 | restrictToWorkspace 기본 활성 | `pkg/tools/filesystem.go:281-390` |
 | **TinyClaw** | X | X | X | 디렉터리만 분리 | `--dangerously-skip-permissions` 항상 사용 |
 | **OpenJarvis** | X (subprocess_sandbox) | X | SSRF 방지 + 감사로그 | SINK_POLICY 기반 데이터 흐름 제한 | `subprocess_sandbox.py`, `audit_log.py` |
+| **OpenFang** | X (프로세스 격리) | **O** (WASM Dual Metering — CPU cycles + memory allocation) | WASM 샌드박스 내 도구 실행 | Capability-gated 파일시스템 접근 | `crates/wasm/src/metering.rs` |
+| **NemoClaw** | **O** (Docker container + Landlock MAC + seccomp + 네트워크 네임스페이스) | X | OS 4중 격리 — 분석 대상 중 최강 | 컨테이너 내부로만 파일시스템 접근 제한 | `nemoclaw/sandbox/container.py`, `nemoclaw/sandbox/landlock.py` |
 
 ### 2.4 도구 실행 안전성
 
@@ -90,6 +100,8 @@
 | **PicoClaw** | **77개 정규식** denylist + 커스텀 패턴 | — | `filepath.IsLocal()` + 심링크 추적 | 10,000자 | `pkg/tools/shell.go:29-77` |
 | **TinyClaw** | X (제한 없음) | X | X | — | `--dangerously-skip-permissions` |
 | **OpenJarvis** | RBAC 10종 + SINK_POLICY (web_search: PII+SECRET 금지, channel_send: SECRET 금지, code_interpreter: SECRET 금지) | SSRF 방지 | Taint label 기반 경로 제한 | 속도 제한 | `rbac.py`, `sink_policy.py` |
+| **OpenFang** | WASM 샌드박스 내 실행 + Capability-gated (18종) + Dual Metering (CPU + 메모리) | Capability 기반 네트워크 정책 | WASM 경로탐색 차단 | WASM 연료 기반 자원 제한 | `crates/capability/src/lib.rs`, `crates/wasm/src/metering.rs` |
+| **NemoClaw** | 컨테이너 내부 전체 샌드박스 실행 | 네트워크 네임스페이스 격리 + 미지 egress 운영자 승인 | 컨테이너 파일시스템 격리 | Docker 자원 제한 | `nemoclaw/sandbox/network.py`, `nemoclaw/policy/egress.py` |
 
 ### 2.5 Human-in-the-Loop
 
@@ -103,6 +115,8 @@
 | **PicoClaw** | X (자율 실행) | — | — | `pkg/tools/toolloop.go:134-158` |
 | **TinyClaw** | △ (Pairing만, 도구 승인 없음) | 채널 접근만 | — | `src/lib/pairing.ts:73-81` |
 | **OpenJarvis** | X (자율 실행) | — | — | RBAC + 감사로그로 사후 추적 |
+| **OpenFang** | **O** (Capability별 설정 가능 승인 흐름) | Capability 유형별 구성 가능 | — | `crates/capability/src/approval.rs` |
+| **NemoClaw** | **O** (미지 egress 요청 운영자 승인 흐름) | 알 수 없는 외부 네트워크 요청 | — | `nemoclaw/policy/egress.py` |
 
 ### 2.6 비용/속도 제한
 
@@ -116,6 +130,8 @@
 | **PicoClaw** | 제공자 지수 백오프 쿨다운 | X | RPM 설정, max_tokens=32768 | `pkg/providers/cooldown.go:183-207` |
 | **TinyClaw** | X | X | 대화당 50메시지, 재시도 5회, TTL 30분 | `src/lib/conversation.ts:12` |
 | **OpenJarvis** | 속도 제한 (구현) | X | — | `rate_limiter.py` |
+| **OpenFang** | WASM Dual Metering — CPU 사이클 + 메모리 할당 이중 계량 | X (Metering으로 자원 제한) | WASM 연료 기반 실행 상한 | `crates/wasm/src/metering.rs` |
+| **NemoClaw** | X | X | 단일 추론 제공자 라우팅 (비용 제어 간접) | `nemoclaw/inference/gateway.py` |
 
 ### 2.7 프롬프트 인젝션 방어
 
@@ -128,7 +144,9 @@
 | **ZeroClaw** | **O** (PromptGuard 6패턴) | 시스템 오버라이드/역할혼란/JSON인젝션/시크릿추출/커맨드인젝션/탈옥 탐지 | `src/security/prompt_guard.rs` |
 | **PicoClaw** | X | 없음 (셸 denylist이 간접 방어) | — |
 | **TinyClaw** | X | 없음 (`[@teammate:]` 태그 파싱이 인젝션 벡터) | `src/lib/routing.ts:66` |
-| **OpenJarvis** | **O** (Prompt Injection Scanner) | regex 기반 스캔 + 4개 위협 수준 분류 (LOW/MEDIUM/HIGH/CRITICAL) — 10개 프레임워크 중 명시적 Scanner 유일 | `prompt_injection_scanner.py` |
+| **OpenJarvis** | **O** (Prompt Injection Scanner) | regex 기반 스캔 + 4개 위협 수준 분류 (LOW/MEDIUM/HIGH/CRITICAL) | `prompt_injection_scanner.py` |
+| **OpenFang** | **O** (다층 방어 + Taint Tracking) | 다층 인젝션 방어 + 데이터 흐름 전체의 Taint Tracking — WASM 격리로 인젝션 영향 범위 물리적 제한 | `crates/safety/src/lib.rs`, `crates/taint/src/lib.rs` |
+| **NemoClaw** | **O** (추론 게이트웨이 격리) | 샌드박스에서 직접 인터넷 접근 차단 → 인젝션 소스 자체를 격리. 외부 데이터는 추론 게이트웨이를 통해서만 유입 | `nemoclaw/inference/gateway.py` |
 
 ---
 
@@ -199,6 +217,38 @@
   - HITL 없음 (자율 실행)
   - 비용/예산 하드 한도 없음
 
+### 3.9 OpenFang — "WASM Capability 기반 차세대 보안"
+
+**보안 철학**: WASM 샌드박스 + 18종 Capability 시스템 + Taint Tracking의 결합. 기존 Tier 1(IronClaw, ZeroClaw)의 WASM 격리에 더해, 데이터 흐름 추적(Taint)과 세밀한 Capability 권한 부여를 통합한 Tier S 아키텍처.
+
+- **강점**:
+  - **18종 Capability 타입**: 도구별 세밀한 권한 선언. 파일 읽기/쓰기/네트워크/프로세스 등 각 Capability를 독립적으로 부여하거나 거부
+  - **Taint Tracking**: 데이터 흐름 전체 추적. WASM 격리와 결합되어 "도구가 데이터를 볼 수 있어도 특정 경로로 흘릴 수 없음"
+  - **WASM Dual Metering**: CPU 사이클 + 메모리 할당을 동시에 계량. 기존 연료(fuel) 단일 계량 대비 자원 남용 탐지 정밀도 향상
+  - **OS Keyring 통합 + 암호화 볼트 + per-tool 자격증명 스코핑**: 자격증명 보안의 3중 방어
+  - **HITL Capability 승인 흐름**: Capability 유형별로 구성 가능한 승인 절차
+  - **A2A 프로토콜**: 에이전트 간 통신에도 Capability 기반 보안 적용
+- **약점**:
+  - Docker 컨테이너 격리 없음 (WASM만)
+  - 일별 비용 하드 한도 없음
+
+### 3.10 NemoClaw — "OS 4중 격리 특화 샌드박스 플러그인"
+
+**보안 철학**: 단일 책임 원칙 — 보안/격리에만 집중. 자체 메모리/기억/브라우저 시스템 없이, Docker + Landlock MAC + seccomp + 네트워크 네임스페이스의 4중 OS 격리로 OpenClaw 호스트를 보호하는 플러그인 형태.
+
+- **강점**:
+  - **Docker + Landlock MAC + seccomp + 네트워크 네임스페이스**: 4중 OS 격리 — 분석 대상 13개 중 OS 레벨 격리 최강
+  - **HITL egress 승인**: 알 수 없는 외부 네트워크 요청에 대해 운영자 승인 흐름 트리거
+  - **OpenShell 자격증명 주입**: 자격증명 값이 샌드박스 내부에 직접 노출되지 않음
+  - **추론 게이트웨이 격리**: 샌드박스에서 직접 인터넷 접근 불가 → 프롬프트 인젝션 소스 격리
+  - **10개 네트워크 정책 프리셋 (커넥터)**: binary-scoped 네트워크 규칙으로 egress 세밀 제어
+  - **마이그레이션 스냅샷**: 런 상태 tar 아카이브로 보안 환경 이식 가능
+- **약점**:
+  - WASM 격리 없음 (Docker에 의존)
+  - 자격증명 암호화 없음 (credentials.json mode 600만)
+  - 자체 HITL 도구 승인 없음 (egress 승인만)
+  - 비용/예산 하드 한도 없음
+
 ---
 
 ## 4. 핵심 보안 패턴 5가지
@@ -235,6 +285,8 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
 ```
                     격리 수준 높음
                          ↑
+    NemoClaw ─────── Docker + Landlock MAC + seccomp + 네트워크 네임스페이스 (4중 OS 격리)
+    OpenFang ─────── WASM Dual Metering + Capability-gated (CPU+메모리 이중 계량)
     IronClaw ─────── WASM + Docker (cap_drop ALL, ro rootfs)
     ZeroClaw ─────── WASM + Landlock/Firejail/Bubblewrap/Docker
     NanoClaw ─────── Docker (non-root, mount-security)
@@ -252,21 +304,25 @@ ZeroClaw는 독특하게 **5중 파싱 기반 방어**(서브쉘/리다이렉션
 | 설계 | 구현체 | 특징 |
 |------|--------|------|
 | **세밀한 도구별 승인** | IronClaw, ZeroClaw | 위험도별 승인/자동허용/항상승인 |
+| **Capability별 설정 가능 승인** | OpenFang | 18종 Capability 유형별 승인 흐름 구성 |
+| **미지 egress 승인** | NemoClaw | 알 수 없는 외부 네트워크 요청에만 운영자 승인 |
 | **실행 승인 요청** | OpenClaw | 채널(Discord 등)로 승인 요청 발송 |
 | **진입점 제어만** | TinyClaw (Pairing) | 접근 자체만 제한, 내부 실행은 자율 |
-| **없음** | Nanobot, NanoClaw, PicoClaw | 완전 자율 실행 |
+| **없음** | Nanobot, NanoClaw, PicoClaw, OpenJarvis | 완전 자율 실행 |
 
 **가장 정교한 HITL**: ZeroClaw의 E-Stop 시스템. `KillAll` / `NetworkKill` / `DomainBlock` / `ToolFreeze` 4단계 긴급 정지 + OTP 없이 해제 불가.
 
 ### 패턴 5: "프롬프트 인젝션 방어" 계층 구조
 
 ```
-Layer 5: 전용 탐지 + 차단 + 위협 수준 분류 (OpenJarvis Prompt Injection Scanner: LOW/MEDIUM/HIGH/CRITICAL)
-Layer 4: 전용 탐지 + 차단 (IronClaw SafetyLayer, ZeroClaw PromptGuard)
-Layer 3: 경계 마커 + 패턴 탐지 (OpenClaw external-content)
-Layer 2: 레이블링 + 이스케이프 (Nanobot 컨텍스트 태그, NanoClaw 스케줄 태그)
-Layer 1: 구조적 격리만 (PicoClaw denylist 간접 방어)
-Layer 0: 방어 없음 (TinyClaw — 인젝션 벡터 존재)
+Layer 6: 소스 격리 + Taint Tracking + WASM 물리적 제한 (OpenFang — 인젝션 소스 자체를 WASM 격리로 봉쇄 + 데이터 흐름 추적)
+Layer 5: 소스 격리 (NemoClaw — 추론 게이트웨이로 직접 인터넷 접근 차단, 인젝션 경로 원천 봉쇄)
+Layer 4: 전용 탐지 + 차단 + 위협 수준 분류 (OpenJarvis Prompt Injection Scanner: LOW/MEDIUM/HIGH/CRITICAL)
+Layer 3: 전용 탐지 + 차단 (IronClaw SafetyLayer, ZeroClaw PromptGuard)
+Layer 2: 경계 마커 + 패턴 탐지 (OpenClaw external-content)
+Layer 1: 레이블링 + 이스케이프 (Nanobot 컨텍스트 태그, NanoClaw 스케줄 태그)
+Layer 0: 구조적 격리만 (PicoClaw denylist 간접 방어)
+Layer -1: 방어 없음 (TinyClaw — 인젝션 벡터 존재)
 ```
 
 ---
