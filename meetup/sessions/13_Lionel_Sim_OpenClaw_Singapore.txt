@@ -1,0 +1,18 @@
+# [발표] Lionel Sim (OpenClaw Singapore) - Building OpenClaw Community in Singapore | 17:20~17:30 | [06:36:52]~[06:46:07]
+
+[06:36:52] one basically we do have some
+[06:37:11] 그 이분은 어떤 분인지 얘기해 드면은 그 싱가포르 오픈클럽 커뮤니티를 운영하고 있는고 네. 그래서 이제 저희가 지금 서울 지역 있고 싱가포르가 있고 그다음에
+[06:37:22] 샹아이 지금 운영하시려는 브라이언님 오른쪽 오셨어요.
+[06:37:27] 하고 he's like introduce how clore community works and what the how the community is can you just
+[06:37:44] yeah so i just try to share the screen
+[06:37:56] Ja.
+[06:37:57] Nice one.
+[06:38:23] I can see next time.
+[06:38:24] Ja.
+[06:43:32] Ja. So let me take some questions.
+[06:43:35] 그 질문 혹시 있으시면 so how like some
+[06:43:48] engineers like very working on some open source any open source that you want to share around some open club plugins or hardness engineer
+[06:43:58] stuff do you have any in your mind
+[06:45:04] Do you have any other personal projects that works with open like any try to automate something else
+[06:45:47] any other thanks for having timeable for땡큐바이
+[06:46:07] 되네요 되네 네.

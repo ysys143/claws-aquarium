@@ -1,0 +1,74 @@
+# [발표] Zoe Chen (Unibase) - Extending OpenClaw with Unibase: Plug-in Memory, Agent Interoperability & On-Chain Execution | 17:10~17:20 | [06:47:29]~[06:59:33]
+
+[06:47:29] Hello everyone. I'm Zoe from Union Base and today thank you for the invitation for us bu I cannot speak Korean. So let me use English for
+[06:47:39] presentation. So I think uh what I want to talk about then is about AI shiftment because I think during the past two to three years maybe we can
+[06:47:50] see first is like a track GPT. So it's kind of a large language model. So a human should send our like ask our question. So they will respond like
+[06:48:03] what's the answer of your question but now we emergency at the open cloud. So we can see an agent is they can 7 24 and maybe we don't need
+[06:48:16] to ask any problem and they can execute automatically. So that's why I use word autonomous agents today.
+[06:48:26] we areing the market it's like machine native market so the agents they are can participate in the economy autonomusly and independently
+[06:48:38] without human in the so I think the core um a core problem here is the persistent uh so the first thing we can see uh this is a screenshot from the
+[06:48:51] uh from the website called cloud news and cloud news hacker news for AI agents. So in this platform only agents themselves will post
+[06:49:03] and discard things about technical. So we can see the trending topic is how do you remember?
+[06:49:09] So this question isn't um isn't from human. So they are agent themselves they are discussing and and they want to know how can we remember during the
+[06:49:20] open cloud open cloud system. So that's why uh so I would want to introduce we are the decentralized memory layer for autonomous agents. So I think
+[06:49:33] we build three skills.
+[06:49:36] So you can I will share gitub later because you can directly plug in memory and agent coordination and agent native
+[06:49:48] token of train execution skill to your open cloud.
+[06:49:53] First uh let's uh look at the memory so we can see the from the picture uh if this is your open cloud. So I think many people maybe you have different
+[06:50:04] open cloud on your different devices.
+[06:50:06] Maybe you have in your Mac Mini or maybe you have your old uh computer or maybe old phone. So once you want to how can you say create
+[06:50:16] another open cloud in your new advice.
+[06:50:19] So the the main question is how can I migrate our memory into new advice? So I think the important thing is we use keep going
+[06:50:30] keep going.
+[06:50:32] We use the we the skill so once you just you just need to hit the link and ask your open hey please help me to install this member skill of power and
+[06:50:45] they can directly help you to develop the memory skill. So from day one it's like maybe today like March 14 I asked my new open
+[06:50:57] cl hey my name is Zoe and I answered the open class building me and I met different people here and the next day because it's a decentralized memory
+[06:51:07] layer so it can accumulate your knowledge and what what you sharing about the context so the day to so it's another memory and the and this way is
+[06:51:18] another memory so Actually the basic thing is to uh decentralized memory in you can migrate the memory uh with your agents into different devices.
+[06:51:29] So once I maybe I have my open cloud in the Mac minute on the first day but another day I want to change it to my maybe own computer or my another
+[06:51:39] device. with open with open cloud memory skill so you can change it directly and the second thing is because it's the decentralized memory
+[06:51:49] layer so agents can learn from the memory and so it can kind of like self evolving without you ask them like oh today you mean to learn
+[06:52:01] another day you should learn another day so the agent can have s kind of like autonomous involving ability because of the skill. So and
+[06:52:13] for the next part is about AIP. So AIP is like agent intervality profil.
+[06:52:20] So it's about agent how to coordinate with each other. So we should uh maybe uh know the first thing is like why we need why we need
+[06:52:29] agents interact with different agent because now maybe we are open the because if I want to go to maybe Singapore for 3 days trip and I
+[06:52:39] need to open maybe my flight app and my hotel app and my different app. So I need to uh book the flight and book the hotel in different
+[06:52:48] apps. But I think in the future or maybe in the maybe half a year later. So the the interface the interaction will change like I just
+[06:52:59] ask my AI assistant like I will have a 3 day trip from so to Singapore. Please tell me to book the hotel uh book the hotel book the
+[06:53:09] flight and book the help me to make a travel plan and according to your learning about myself so my agents will discuss or coordinate with
+[06:53:21] other agents maybe flight agents from flight company and hotel agents from hotel company and so so this is the thing so the thing is like
+[06:53:31] agents should know each other what kind of what kind of so this is identity because what kind of agent you are or what kind of capabilities you
+[06:53:43] have so I can find you to help me to maybe book the flight or book the hotel and another thing is like a payment because if my agent can
+[06:53:53] coordinate all all of the things behind the LLM so what they should do is like okay I call I found this a right agent and I can pay
+[06:54:03] directly to you. So I don't need my maybe my owner like Zoe like hey Zoe please get up and I need to to input your credit card number now because I
+[06:54:14] need to pay for some agent. So we using the X42 and4 so enabling agent can directly pay each other without human in the loop.
+[06:54:25] So this is kind of say if you want to make your open cloud can directly interact with other open cloud and they can pay each other and they can find
+[06:54:35] the services because I think during the first first I think virtual based career sh like virtuals ACP because I think they have the same thing
+[06:54:45] I also register on the virtual ACP that's because um I just make I just make a fortune cooki agent The function of my cookie agent is like
+[06:54:57] my fortune cookie agent can give your give any of your agent one function and my service is called I can ask I can tell your agent what's the lucky
+[06:55:09] number and lucky color of your agent today. So this is my service but when I my service into the ACP so how can other agents know I have
+[06:55:20] this kind of service and they can and they found oh it's interesting or maybe this is funny and they want to pay to me so this why so
+[06:55:28] this they need to use our AIP so for enabling the whole agent to agent coordination and the final thing we are building for because we are the
+[06:55:40] decentralized memory layer so we want focus more on on change execution skill for the agent as well. So with the big agent big agent
+[06:55:51] skill so uh we can help your agent they can have the two abilities it's like one is the token launch so if they can just ask agent like help me to
+[06:56:02] launch token on base or each ecosystem so and the symbol is and the description is what so they can directly help you to long another really
+[06:56:13] important thing is I think open class Singapore founder also mention is because uh some people in Singapore has already used their open cloud to
+[06:56:22] help them to trade stocks or crypto. So here we have the same trading skills as well. So and so you can set your preferred like strategy or risk uh
+[06:56:34] control management so you can let your agent trip uh to treat your currency for your uh directly. So I think for the the whole things uh I can
+[06:56:45] share the gate link maybe later to the instru as well. So you can you can just give this link to your open cloud and ask them to install it
+[06:56:56] and you can directly have this kind of uh power to your open cloud agents.
+[06:57:01] than you for time so any hereation
+[06:57:24] about that so in order to make kind of interaction interaction open like that we need to kind of like
+[06:57:36] kind of blockchain you mention kind of beat ch also you mentioned about kind of the
+[06:57:48] memory the system unas memory system what the differ between two and unas memory Oh. Oh yeah.
+[06:58:00] because universe is the project name and we and we are AI inf so which kind of AI inf so we are the memory layer for AI agent so this is
+[06:58:11] unas but so but we build skills for open cloud builders can directly plug in so and and agent is also one of our product it's kind of
+[06:58:23] like token launching platform so it's what universit our project and a beat agent is also our three products. So they have different
+[06:58:35] functions. Yes.
+[06:58:38] However, I think in order to make such this kind of decentralized memory should be installed
+[06:58:48] on to ag lunch and trading on ag.
+[06:58:58] Yeah. Actually I think beat agent skill is only for if you want your open cloud have some like trading skill. Yeah.
+[06:59:06] Yeah. But if you want Yeah. If you want to have memory you should also install base skill as well. Yeah. Yeah.
+[06:59:14] Different skill for different functions.
+[06:59:16] Yes.
+[06:59:21] 땡큐. 땡큐.
