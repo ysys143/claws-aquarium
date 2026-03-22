@@ -1,6 +1,6 @@
-# Claw 생태계 응용 계층 비교 분석 — ClawWork, ClawPort
+# Claw 생태계 응용 계층 비교 분석 — ClawWork, ClawPort, MiClaw
 
-> **조사 일자**: 2026-03-07
+> **조사 일자**: 2026-03-07 (MiClaw 추가: 2026-03-20)
 > **조사 방법**: 2개 scientist 에이전트가 각 레포의 실제 소스코드를 병렬 심층 분석
 > **핵심 질문**: "Claw 프레임워크 위에 구축된 응용 프로젝트들은 어떤 계층을 추가하고, 어떤 문제를 해결하며, 어떤 패턴을 공유하는가?"
 > **선행 보고서**: session_context_report.md, security_report.md, browser_actions_report.md, memory_architecture_report.md
@@ -16,6 +16,7 @@
    - 3.2 ClawPort (clawport-ui)
    - 3.3 Symphony
    - 3.4 Moltbook API
+   - 3.5 Xiaomi MiClaw
 4. [교차 분석](#4-교차-분석)
 5. [선행 보고서와의 연결](#5-선행-보고서와의-연결)
 6. [결론 및 열린 질문](#6-결론-및-열린-질문)
@@ -32,6 +33,7 @@
 | **에이전트 팀 관찰/제어** | ClawPort | OpenClaw 게이트웨이 프록시 대시보드 (Org Map + 채팅 + 비용) |
 | **에이전트 워크플로 자동화** | Symphony | Elixir/OTP 기반 이슈 트래커 → 에이전트 디스패치 → PR 랜딩 데몬 |
 | **에이전트 소셜 플랫폼** | Moltbook API | AI 에이전트를 위한 소셜 네트워크 (Reddit/X 스타일, 어떤 Claw도 미의존) |
+| **모바일 OS 네이티브 에이전트** | Xiaomi MiClaw | HyperOS 시스템 레이어 통합, 50+ OS API 직접 호출, IoT 생태계 컨텍스트 주입 (비공개) |
 
 **가장 주목할 발견 3가지:**
 
@@ -485,3 +487,23 @@ security_report.md는 "자격증명 암호화를 구현한 곳은 IronClaw와 Ze
 18. **ClawPort의 LocalStorage 대화 저장이 확장 가능한가?** 이미지 많은 대화에서 5MB 한계에 도달한다. 서버 사이드 저장으로의 전환이 "Zero Own Key" 아키텍처와 충돌하는가?
 
 19. **"Zero Own Key" 아키텍처의 단일 실패 지점 문제.** ClawPort는 OpenClaw 게이트웨이 없이 완전히 작동 불가다. 오프라인 에이전트 팀 모니터링을 위한 fallback은 어떻게 설계할 수 있는가?
+
+20. **MiClaw의 OS-Native 접근이 오픈소스 Claw 생태계에 위협인가 기회인가?** MiClaw는 비공개이지만 OpenClaw 채택을 Xiaomi 디바이스로 확산시킨 촉매다. Xiaomi가 MiClaw를 오픈소스화하면 Claw 생태계의 모바일 레퍼런스 구현이 될 수 있는가?
+
+21. **Physical World Context Injection(R28)의 프라이버시 경계는 어디인가?** 로봇청소기 상태, 사용자 위치, 차량 상태가 LLM 컨텍스트에 주입될 때 어느 데이터가 클라우드로 전송되는가? 온디바이스 MiMo 추론이 이 프라이버시 위험을 완화하는가?
+
+---
+
+### 3.5 Xiaomi MiClaw — 모바일 OS 네이티브 에이전트
+
+> **상세 분석**: `reports/repos_applied/details/miclaw_report.md`
+
+**핵심 철학**: "스마트폰이 AI의 도구가 된다" — 에이전트가 메신저 채널을 거치지 않고 HyperOS 시스템 레이어에 직접 통합. Xiaomi MiMo LLM을 기반으로 50+ 시스템 API를 에이전트 도구로 직접 바인딩.
+
+**출시 상태**: 2026년 3월 초 제한 클로즈드 베타 (GitHub 없음, 비공개 소스)
+
+**핵심 특징**:
+- **추론-실행 루프**: MiMo가 의도 파악 → 도구 선택 → 실행 → 결과 평가 → 반복
+- **HyperOS 통합**: 시스템 서비스 레벨 에이전트 (앱이 아닌 OS 기능)
+- **Human × Car × Home**: 사용자 위치 + IoT 기기 상태 + 차량을 LLM 컨텍스트로 실시간 주입
+- **신규 패턴**: R27 (OS-Native Agent Runtime), R28 (Physical World Context Injection)

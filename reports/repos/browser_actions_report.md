@@ -556,3 +556,98 @@ OpenJarvis는 에이전트 타입 선택(`orchestrator`, `monitor_operative` 등
 > - 각 프레임워크의 프롬프트 엔지니어링 전략 (시스템 프롬프트 구조, few-shot 패턴)
 > - 비용 추적/제한 메커니즘 심층 분석
 > - 실시간 스트리밍/SSE 아키텍처 비교
+
+---
+
+## Chat Template 직렬화 심층 분석 (2026-03 meetup 추가)
+
+**소스**: 민용기 발표 (08_민용기_에이전트_엔진룸_툴콜링, FriendliAI)
+
+### 원리: LLM은 텍스트만 본다
+
+Function Calling은 채 템플릿(Chat Template)을 통해 시스템 프롬프트 위에 툴 스키마가 **텍스트로 직렬화**되어 삽입되는 구조. 모델은 이를 보고 다음 토큰을 예측하는 방식으로 툴 호출을 생성.
+
+```
+[개발자가 전달]
+  tools: [{ name: "get_weather", params: {city: str} }]
+
+[채 템플릿이 변환]
+  시스템 프롬프트에 직렬화된 텍스트로 삽입
+  모델마다 포맷 다름
+
+[모델이 생성]
+  "<tool_call>get_weather(city="Seoul")</tool_call>"
+  → 인퍼런스 엔진이 파싱 → JSON 반환
+```
+
+### 모델별 Tool Call 포맷 비교
+
+| 모델 | 내부 포맷 특성 | 비고 |
+|------|-------------|------|
+| **GLM 4.7** (Zhipu AI) | 자체 XML 유사 포맷 | 중국 모델 |
+| **Gemini** | 별도 직렬화 방식 | Google 독자 포맷 |
+| **GPT** (OpenAI) | JSON 스키마 기반 | 가장 광범위하게 쓰임 |
+| **Claude** (Anthropic) | XML/JSON 혼합 | `<tool_use>` 태그 |
+
+**핵심 발견**: 같은 모델이라도 채 템플릿 튜닝만으로 BFCL(Berkeley Function Calling Leaderboard) 기준 7~8% 성능 향상 확인 (Gemini 2.5 Flash 실험).
+
+### 최적화 방법
+
+1. **커스텀 프롬프트 인젝터**: 모델의 기본 채 템플릿에 자체 툴 콜 파서 + 프롬프트 인젝터 적용
+2. **인퍼런스 엔진별 차이**: vLLM, SGLang 등 인퍼런스 엔진마다 파싱 구현 상이 → 엔진 선택 시 고려 필요
+3. **로컬 모델 최적화**: 기본 채 템플릿이 최적이 아닐 수 있음 → 커스텀 템플릿으로 성능 개선 가능
+
+### 기존 Claw 프레임워크와의 연관성
+
+| 프레임워크 | Tool Call 방식 | 채 템플릿 커스터마이즈 |
+|----------|-------------|-----------------|
+| IronClaw | MCP 표준 | 없음 (Anthropic API 직접) |
+| OpenClaw | MCP 표준 | 없음 |
+| ZeroClaw | MCP 표준 | 없음 |
+| oh-my-openclaw | 커스텀 하네스 | HashLine + 채 템플릿 최적화 예정 |
+
+---
+
+## HashLine 편집 패턴 (2026-03 meetup 추가)
+
+**소스**: 민용기 발표 (08_민용기, Plugr 프로젝트)
+
+### 배경: String Replace 방식의 한계
+
+기존 파일 편집 방식:
+```
+old_string: "function foo() {\n  return bar;\n}"
+new_string: "function foo() {\n  return baz;\n}"
+```
+
+**문제점**:
+- 동일 문자열이 파일 내 여러 곳에 있으면 오류
+- 모델이 정확한 old_string을 재현하기 어려움
+- 로컬 모델의 제한된 컨텍스트 윈도우 환경에서 실패율 높음
+
+### HashLine 방식
+
+각 라인에 고유한 해시 앵커를 부여:
+
+```
+파일 내용 (해시 앵커 포함):
+  #a3f2 function foo() {
+  #b7c1   return bar;    ← 변경 대상 라인
+  #d4e9 }
+
+편집 명령:
+  CHANGE #b7c1 TO "  return baz;"
+```
+
+**원리**: 모델이 변경 대상 라인을 해시로 정확하게 지정 → 모호성 제거.
+
+### 두 방식 비교
+
+| 항목 | String Replace | HashLine |
+|------|---------------|---------|
+| **고유 식별** | 내용 의존 (중복 가능) | 해시 (고유) |
+| **실패 조건** | 중복 문자열 | 해시 충돌 (매우 드묾) |
+| **로컬 모델 적합성** | 낮음 | 높음 |
+| **컨텍스트 효율** | old+new 모두 전송 | 해시 + new만 전송 |
+| **구현** | 단순 | 해시 계산 필요 |
+| **현재 채택** | Claude Code 기본 | oh-my-openclaw 예정 |

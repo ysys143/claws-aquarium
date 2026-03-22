@@ -21,8 +21,11 @@
 9. [OpenFang (Agent OS)](#9-openfang--rust-agent-os)
 10. [OpenJarvis (로컬 퍼스트)](#10-openjarvis--python--rust-로컬-퍼스트-개인-ai)
 11. [NemoClaw — NVIDIA](#11-nemoclaw-nvidia--openclaw-샌드박스-플러그인)
-12. [종합 비교표](#종합-비교표)
-13. [핵심 인사이트](#핵심-인사이트)
+12. [NullClaw (Zig)](#12-nullclaw--zig-극한-최소화)
+13. [Hermes Agent (Nous Research)](#13-hermes-agent--python-자기개선-에이전트)
+14. [Claude Code (Anthropic)](#14-claude-code--javascript-공식-플랫폼)
+15. [종합 비교표](#종합-비교표)
+16. [핵심 인사이트](#핵심-인사이트)
     - [자격증명 딜레마](#6-자격증명-딜레마--권한을-줘야-일을-하는데-주면-위험하다)
 
 ---
@@ -838,6 +841,130 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 
 ---
 
+## 12. NullClaw — Zig (극한 최소화)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [nullclaw/nullclaw](https://github.com/nullclaw/nullclaw) |
+| **Stars** | 6,400 |
+| **언어** | Zig 0.15.2 |
+| **라이선스** | MIT |
+| **코드량** | ~249,000 LOC |
+| **바이너리** | 678 KB 정적 |
+| **시작 시간** | <2ms |
+| **RAM** | ~1 MB 피크 |
+
+### 핵심 특징
+
+- **생태계 최소 바이너리**: 678 KB — ZeroClaw(8.8MB)보다 13배 작음
+- 50+ AI 프로바이더, **19개 메시징 채널** (Signal, Nostr, Matrix 포함 — 생태계 유일)
+- 35+ 도구, **10개 메모리 엔진** (SQLite/PostgreSQL/Redis/ClickHouse + 벡터/하이브리드)
+- **WASI 타겟** (`main_wasi.zig`) — WebAssembly 배포 지원 (10개 프레임워크 중 유일)
+- **A2A 프로토콜** (`a2a.zig`) — OpenFang, OpenJarvis와 동일
+- **vtable 기반 플러그어블 아키텍처** — 설정만으로 모든 서브시스템 교체
+
+### 보안 모델
+
+- **ChaCha20-Poly1305** 암호화 (ZeroClaw와 동일 알고리즘)
+- **Landlock/Firejail/Bubblewrap/Docker** 샌드박스 옵션 (OS 레벨 격리)
+- 게이트웨이 페어링 필수 (원타임 코드), localhost 기본 바인딩
+- 채널 **deny-all 기본** — 명시적 opt-in 필요
+
+### 차별점
+
+| 특성 | NullClaw | 비교 |
+|------|----------|------|
+| **언어** | Zig (유일) | 전체 생태계 유일 |
+| **바이너리** | 678 KB | ZeroClaw 8.8MB의 1/13 |
+| **WASI** | [O] | 10개 프레임워크 중 유일 |
+| **Nostr/Matrix** | [O] | 10개 프레임워크 중 유일 |
+
+### 참고 링크
+
+- [GitHub — nullclaw/nullclaw](https://github.com/nullclaw/nullclaw)
+
+---
+
+## 13. Hermes Agent — Python (자기개선 에이전트)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent) |
+| **Stars** | 9,269 |
+| **언어** | Python |
+| **라이선스** | MIT |
+| **생성일** | 2025-07-22 |
+| **빌더** | Nous Research |
+
+### 핵심 특징
+
+- **자기개선 루프**: 복잡한 작업 후 스킬 자동 생성, 사용 중 자동 개선 (agentskills.io 표준)
+- **이중 메모리**: MEMORY.md (에이전트 노트) + USER.md (사용자 프로파일), **Frozen Snapshot 패턴** (prefix cache 보존)
+- **Skills Guard**: builtin/trusted/community/agent-created 4단계 신뢰 정책 + 정적 분석 스캐너
+- **Tirith pre-exec 스캐너**: 외부 바이너리, SHA-256 + cosign 서명 검증, 자동 설치
+- **6종 터미널 백엔드**: local, Docker, SSH, Daytona, Singularity, Modal (서버리스)
+- **6종 메시징 플랫폼**: Telegram, Discord, Slack, WhatsApp, Signal, HomeAssistant
+- **위임 아키텍처**: MAX_DEPTH=2, MAX_CONCURRENT=3, blocked tools 명시, ThreadPoolExecutor
+- **RL**: Atropos 환경, OPD 환경, SWE 환경, 궤적 압축
+- **Topics에 openclaw/clawdbot/moltbot 포함** — Claw 생태계 직접 연결
+
+### 신규 패턴 (R17–R22)
+
+| 패턴 | 설명 |
+|------|------|
+| R17: Frozen Snapshot Memory | 세션 시작 시 메모리 1회 스냅샷, 세션 중 불변 → prefix cache 안정화 |
+| R18: Char-Limited Memory | 토큰이 아닌 문자 단위 예산 (model-agnostic) |
+| R19: Memory Injection Detection | 항목 추가 전 regex + 비가시 유니코드 스캔 |
+| R20: Skills Trust Levels | 4단계 신뢰 정책 + agentskills.io 오픈 스탠다드 |
+| R21: Bounded Delegation Tree | MAX_DEPTH=2, blocked tools, MAX_CONCURRENT=3 |
+| R22: Tirith Pre-Exec Scanner | 외부 바이너리 스캐너, SHA-256 + cosign 서명 검증 |
+
+### 참고 링크
+
+- [GitHub — NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent)
+- [상세 보고서](details/hermes_agent_report.md)
+
+---
+
+## 14. Claude Code — JavaScript (공식 플랫폼)
+
+| 항목 | 내용 |
+|------|------|
+| **패키지** | `@anthropic-ai/claude-code` |
+| **버전** | 2.1.80 (분석 시점) |
+| **채널 플러그인** | [anthropics/claude-plugins-official](https://github.com/anthropics/claude-plugins-official) |
+| **언어** | JavaScript (Node.js 번들) + TypeScript (채널, Bun 런타임) |
+| **번들 크기** | cli.js 12MB (minified) |
+| **라이선스** | 독점 (CLI) / 오픈소스 (채널 플러그인) |
+| **개발 팀** | Anthropic |
+| **내부 코드명** | `tengu_harbor` |
+
+### 핵심 특징
+
+- **MCP-as-Channel Bridge**: `notifications/claude/channel` 단일 MCP notification으로 외부 메시징 플랫폼 연결 (R23)
+- **5단계 게이트**: capability → 피처 플래그 → claude.ai 인증 → 조직 정책 → --channels 리스트 순차 검증
+- **Platform-Controlled Allowlist**: Anthropic이 `tengu_harbor_ledger` 피처 플래그로 허용 채널 원격 제어 (R24)
+- **Content/Meta 분리**: 첨부파일 경로 등 메타데이터를 content가 아닌 meta 필드에만 포함해 위조 차단 (R25)
+- **5겹 프롬프트 인젝션 방어**: 메타 격리 + 시스템 프롬프트 경고 + 스킬 설계 + 아웃바운드 게이트 + 파일 exfil 방지
+- **공식 채널 2개**: Telegram (grammy, Long Polling) + Discord (discord.js, Gateway WebSocket)
+- **Static 모드**: CI/서버리스 환경용 — 부팅 시 access.json 스냅샷, 이후 파일 I/O 없음
+
+### 신규 패턴 (R23–R25)
+
+| 패턴 | 설명 |
+|------|------|
+| R23: MCP-as-Channel Bridge | MCP notification 단일 메서드로 모든 외부 메시징 플랫폼 표준화 |
+| R24: Platform-Controlled Allowlist | 플랫폼 벤더가 피처 플래그로 허용 채널 원격 제어 (셀프호스팅과 다른 신뢰 모델) |
+| R25: Content/Meta Channel Separation | 메타데이터와 사용자 입력을 구조적으로 분리해 위조 공격 차단 |
+| R26: Bundled OS-Level Sandbox | npm vendor에 seccomp BPF 필터 + apply-seccomp 바이너리 동봉. 시스템 의존성 없이 OS 레벨 격리 완결 |
+
+### 참고 링크
+
+- [Claude Code 채널 공식 문서](https://code.claude.com/docs/en/channels)
+- [상세 보고서](details/claude_code_report.md)
+
+---
+
 ## 종합 비교표
 
 | 도구 | 언어 | 코드량 | RAM | 시작시간 | 핵심 차별점 | Stars |
@@ -852,21 +979,25 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 | **OpenFang** | Rust | 137K LOC | - | - | Agent OS, 16-레이어 보안, 40채널, FangHub | N/A |
 | **OpenJarvis** | Python+Rust | - | - | - | 로컬 퍼스트, 9 에이전트 유형, 6 추론 엔진 | - |
 | **NemoClaw** | JS/TS/Py | 25,650 | - | - | NVIDIA GPU, OpenClaw 샌드박스 플러그인 | - |
+| **NullClaw** | Zig | ~249K | ~1MB | <2ms | 678KB 정적 바이너리, WASI, Signal+Nostr+Matrix | 6.4K |
+| **Hermes Agent** | Python | - | - | - | 자기개선 루프, Frozen Snapshot 메모리, Skills Trust, Tirith 스캐너 | 9.3K |
+| **Claude Code** | JS+TS | 12MB (번들) | - | - | MCP 채널 표준, seccomp+bwrap 내장 샌드박스, Platform Allowlist, 5겹 인젝션 방어 | N/A (독점) |
 
 ### 차별화 축 매핑
 
 ```
                     보안 강화
                        |
-                   IronClaw
-                       |
+              NullClaw-+IronClaw
+              (Landlock)|
        NanoClaw -------+------- (원조) OpenClaw
        (격리)          |              (풀피처)
                        |
     경량화 ----+-------+--------+---- 협업/오케스트레이션
                |       |        |
            ZeroClaw    |    TinyClaw
-           PicoClaw    |    (멀티팀)
+           NullClaw    |    (멀티팀)
+           PicoClaw    |
            (엣지)      |
                        |
                    Nanobot

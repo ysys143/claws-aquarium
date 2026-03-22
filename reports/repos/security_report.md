@@ -1,6 +1,6 @@
 # 실세계 권한 부여 보안 전략 — 10개 Claw 코드 기반 비교 분석
 
-> **조사 일자**: 2026-03-05 (OpenJarvis 추가: 2026-03-14, OpenFang/NemoClaw 추가: 2026-03-17)
+> **조사 일자**: 2026-03-05 (OpenJarvis 추가: 2026-03-14, OpenFang/NemoClaw 추가: 2026-03-17, Claude Code 추가: 2026-03-20)
 > **조사 방법**: 7개 scientist 에이전트가 각 레포의 보안/권한 관련 소스코드를 병렬 심층 분석 (OpenJarvis, OpenFang, NemoClaw는 별도 추가 분석)
 > **핵심 질문**: "에이전트에게 실세계 권한을 안전하게 부여하기 위해 각 프레임워크가 어떤 보안 전략을 채택했는가?"
 
@@ -25,8 +25,8 @@
 |------|--------|------|
 | **Tier S: Next-Gen Defense** | **OpenFang** | WASM Dual Metering + 18종 Capability + Taint Tracking + Keyring + HITL 승인 흐름 — 기존 Tier 1을 능가하는 다층 방어 |
 | **Tier 1: Defense-in-Depth** | IronClaw, ZeroClaw | 암호화 볼트 + WASM/Docker 이중 샌드박스 + 다층 인젝션 방어 + HITL 승인 + 비용 제한 |
-| **Tier A+: Sandbox-First** | **NemoClaw** | Docker + Landlock + seccomp + 네임스페이스 격리 + HITL(미지 egress 승인) + 추론 게이트웨이 격리 |
-| **Tier 2: Container-First** | NanoClaw, OpenClaw, **OpenJarvis** | Docker/subprocess 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어. OpenJarvis는 Prompt Injection Scanner 명시적 구현으로 Tier 2 상단에 위치 |
+| **Tier A+: Sandbox-First** | **NemoClaw**, **Claude Code** | OS 레벨 격리 + HITL 또는 소프트 보안 병행. NemoClaw: Docker+Landlock+seccomp+namespace+추론 게이트웨이 격리. **Claude Code**: seccomp BPF+bwrap(Linux)/native sandbox(macOS), npm vendor에 BPF 동봉, 5겹 채널 프롬프트 인젝션 방어, Platform-Controlled Allowlist. 암호화 볼트 없음 |
+| **Tier 2: Container-First** | NanoClaw, OpenClaw, **OpenJarvis**, **Hermes Agent** | Docker/subprocess 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어. OpenJarvis는 Prompt Injection Scanner 명시적 구현, Hermes Agent는 Tirith 외부 바이너리 pre-exec 스캐너 + Memory Injection 탐지 + Skills Trust 4단계 |
 | **Tier 3: Denylist-Based** | Nanobot, PicoClaw | 정규식 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음 |
 | **Tier 4: Minimal/None** | TinyClaw | 보안 메커니즘 최소 또는 해당 없음 (실험적 용도) |
 
@@ -400,3 +400,99 @@ SINK_POLICY 예시:
 3. **프롬프트 인젝션의 근본적 한계**: IronClaw의 18개 패턴, ZeroClaw의 6개 패턴, OpenJarvis의 regex Scanner는 알려진 공격만 탐지한다. 새로운 인젝션 기법에 대한 적응형 방어가 가능한가?
 4. **E-Stop의 메신저 통합**: ZeroClaw의 E-Stop을 Telegram 기반 시스템에서 구현하면 어떤 형태가 되는가? 메시지 하나로 에이전트를 즉시 정지시킬 수 있는가?
 5. **Taint Tracking의 완전성**: OpenJarvis의 4-label 분류(PII/SECRET/USER_PRIVATE/EXTERNAL)는 실제 데이터 흐름을 얼마나 커버하는가? LLM이 label을 우회하는 방식으로 데이터를 재포장(paraphrase)하면 방어가 무력화되지 않는가?
+
+---
+
+## 실전 보안 패턴 추가 (2026-03 meetup 추가)
+
+### 3-Layer Approval 패턴
+
+**소스**: 최재훈 발표 (03_최재훈_Remote_OpenClaw_다중디바이스제어), 정세민 발표 (16_정세민_Ultraworker_AI_Orchestration)
+
+#### OpenClaw 다중 디바이스 승인 체계 (최재훈)
+
+에이전트가 다중 디바이스를 제어할 때의 계층적 승인:
+
+```
+[Layer 1: 디바이스 승인]
+  어떤 기기에 명령을 내릴 것인가?
+  예) macOS 기기 vs Linux 라즈베리파이 vs Windows PC
+
+[Layer 2: 노드 승인]
+  해당 기기의 어떤 노드(기능 서버)를 통해 실행할 것인가?
+  예) 카메라 노드 vs 브라우저 노드 vs 시스템 노드
+
+[Layer 3: Capability 승인]
+  해당 노드의 어떤 기능을 실행할 것인가?
+  예) 스크린샷 vs URL 변경 vs 파일 접근
+```
+
+**중요**: `system_run`/`exec` 등 정의되지 않은 기능을 허용하려면 리모트 게이트웨이에서 allow list를 수동으로 열어줘야 함 → 기본값은 최소 권한.
+
+#### Ultraworker HITL 승인 체계 (정세민)
+
+Slack BlockKit UI 기반 3단계 사람 검토:
+
+```
+[1단계 승인] 작업 리스트 승인
+  → Slack BlockKit "좋아요 버튼"으로 승인/거부
+
+[2단계 승인] 테크 스펙 승인
+  → 복잡한 업무에서만 적용
+
+[3단계 승인] 구현 완료 보고
+  → 결과 검수 후 승인
+```
+
+**에이전트 강제 종료**: 잘못된 명령 시 Slack 대시보드에서 terminate 가능.
+
+---
+
+### .env 자동 차단 패턴
+
+**소스**: 김동규 발표 (12_김동규_nanoclaw_사용기)
+
+nanoclaw는 `.env` 등 민감 파일에 대한 에이전트 접근을 **자동 차단 패턴**으로 원천 차단:
+
+```
+에이전트가 접근 시도 시:
+  .env → 자동 차단
+  .env.local → 자동 차단
+  secrets.json → 자동 차단
+  (설정 가능한 deny list)
+```
+
+**기존 프레임워크와 비교**:
+
+| 프레임워크 | 민감 파일 보호 방식 |
+|----------|----------------|
+| IronClaw | WASM 능력 attenuation (proxy injection) |
+| ZeroClaw | autosave 키 블랙리스트 |
+| nanoclaw | 자동 차단 패턴 (deny list) |
+| OpenClaw | untrusted-data 면책 선언 |
+
+---
+
+### 로컬 모델 민감 데이터 처리 패턴
+
+**소스**: 윤주운 발표 (09_윤주운_Arbiter_FLOCK_워크플로우)
+
+**원칙**: 보안상 외부 클라우드에 올리기 어려운 개인·기업 데이터는 로컬 모델에서만 처리.
+
+```
+[클라우드 모델] 사용 가능 데이터
+  - 코드 생성 (비즈니스 로직 제외)
+  - 일반 오케스트레이션
+  - 공개 데이터 분석
+
+[로컬 모델] 필수 데이터
+  - 민감한 개인 정보
+  - 기업 기밀 데이터
+  - 장기 메모리 (대화 이력)
+  - 내부 slack/이메일 내용
+```
+
+**실전 구성 (윤주운 FLOCK)**:
+- 코딩·오케스트레이션: 고성능 클라우드 모델
+- 민감 데이터·장기 메모리: RTX 3090 기반 로컬 QwQ 3.2 7B (8비트 양자화, ~50 토큰/초)
+- 모든 대화 기록 NAS에 저장 → 향후 로컬 에이전트 파인튜닝 데이터로 활용
