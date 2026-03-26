@@ -17,6 +17,7 @@
    - 3.3 Symphony
    - 3.4 Moltbook API
    - 3.5 Xiaomi MiClaw
+   - 3.6 MetaClaw
 4. [교차 분석](#4-교차-분석)
 5. [선행 보고서와의 연결](#5-선행-보고서와의-연결)
 6. [결론 및 열린 질문](#6-결론-및-열린-질문)
@@ -34,6 +35,7 @@
 | **에이전트 워크플로 자동화** | Symphony | Elixir/OTP 기반 이슈 트래커 → 에이전트 디스패치 → PR 랜딩 데몬 |
 | **에이전트 소셜 플랫폼** | Moltbook API | AI 에이전트를 위한 소셜 네트워크 (Reddit/X 스타일, 어떤 Claw도 미의존) |
 | **모바일 OS 네이티브 에이전트** | Xiaomi MiClaw | HyperOS 시스템 레이어 통합, 50+ OS API 직접 호출, IoT 생태계 컨텍스트 주입 (비공개) |
+| **에이전트 메타 레이어 (스킬+메모리+RL)** | MetaClaw | OpenAI-compatible 프록시로 7개+ Claw 백엔드를 추상화. 스킬 주입, 세션 간 메모리, GRPO RL + MadMax 유휴-창 훈련 |
 
 **가장 주목할 발견 3가지:**
 
