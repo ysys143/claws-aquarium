@@ -8,4 +8,5 @@
 .cwf/
 
 # macOS
-.DS_Store
+.DS_Store.omc/
+.cwf/
