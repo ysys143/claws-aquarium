@@ -24,8 +24,11 @@
 12. [NullClaw (Zig)](#12-nullclaw--zig-극한-최소화)
 13. [Hermes Agent (Nous Research)](#13-hermes-agent--python-자기개선-에이전트)
 14. [Claude Code (Anthropic)](#14-claude-code--javascript-공식-플랫폼)
-15. [종합 비교표](#종합-비교표)
-16. [핵심 인사이트](#핵심-인사이트)
+15. [GoClaw (Go)](#15-goclaw--go-멀티테넌트-ai-게이트웨이)
+16. [AgentScope (Alibaba)](#16-agentscope--python-otel-first-멀티에이전트-플랫폼)
+17. [CoPaw (agentscope-ai)](#17-copaw--python-14채널-개인-비서)
+18. [종합 비교표](#종합-비교표)
+19. [핵심 인사이트](#핵심-인사이트)
     - [자격증명 딜레마](#6-자격증명-딜레마--권한을-줘야-일을-하는데-주면-위험하다)
 
 ---
@@ -965,6 +968,90 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 
 ---
 
+## 15. GoClaw — Go (멀티테넌트 AI 게이트웨이)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [nextlevelbuilder/goclaw](https://github.com/nextlevelbuilder/goclaw) |
+| **Stars** | 1,400+ |
+| **언어** | Go 1.26 |
+| **LOC** | 약 176,000줄 |
+| **라이선스** | CC BY-NC 4.0 (비상업적) |
+| **커밋** | 832+ |
+
+### 핵심 특징
+
+OpenClaw를 Go로 재구현한 멀티테넌트 AI 에이전트 게이트웨이. PostgreSQL 기반 완전한 테넌트 격리, Docker 3축(mode/access/scope) 샌드박스, AES 암호화, Tailscale VPN 내장, OTel 코어 의존성을 조합한 엔터프라이즈급 단일 바이너리다. 20+ LLM 제공자, 7개 메시징 채널, Wails v2 데스크톱 UI를 지원한다.
+
+### 신규 패턴 (R38–R39)
+
+| 패턴 | 설명 |
+|------|------|
+| R38: 3축 샌드박스 아키텍처 | Docker를 Mode(off/non-main/all) × Access(none/ro/rw) × Scope(session/agent/shared) 3축으로 제어 |
+| R39: VPN-native 에이전트 게이트웨이 | Tailscale tsnet으로 에이전트 게이트웨이 자체를 VPN 노드로 등록 |
+
+### 참고 링크
+
+- 상세 보고서: [details/goclaw_report.md](details/goclaw_report.md)
+
+---
+
+## 16. AgentScope — Python (OTel-first 멀티에이전트 플랫폼)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [agentscope-ai/agentscope](https://github.com/agentscope-ai/agentscope) |
+| **Stars** | 22,000+ |
+| **언어** | Python 3.10+ |
+| **LOC** | 약 42,442줄 |
+| **라이선스** | Apache-2.0 |
+| **개발 팀** | Alibaba Tongyi Lab |
+| **논문** | arXiv:2402.14034 |
+
+### 핵심 특징
+
+Alibaba Tongyi Lab의 연구 기반 멀티에이전트 플랫폼. OpenTelemetry를 코어 의존성으로 내장해 모든 LLM 호출·에이전트 응답·임베딩을 자동 분산 트레이싱 처리한다. MCP ≥1.13 필수 지원, A2A 프로토콜(nacos 서비스 디스커버리), 내장 프롬프트 튜너·모델 선택기를 제공하며, CoPaw·ReMe 등 파생 프레임워크들의 기반 런타임이다.
+
+### 신규 패턴 (R40–R41)
+
+| 패턴 | 설명 |
+|------|------|
+| R40: OTel-first 관찰 가능성 | OTel을 선택적 플러그인이 아닌 코어 의존성으로 채택; @trace_llm, @trace_reply 등 데코레이터 자동 계측 |
+| R41: 내장 프롬프트 튜너 + 모델 자동 선택기 | 배포 전 단계에서 최적 프롬프트·모델을 자동 탐색·평가 |
+
+### 참고 링크
+
+- 상세 보고서: [details/agentscope_report.md](details/agentscope_report.md)
+
+---
+
+## 17. CoPaw — Python (14채널 개인 비서)
+
+| 항목 | 내용 |
+|------|------|
+| **GitHub** | [agentscope-ai/CoPaw](https://github.com/agentscope-ai/CoPaw) |
+| **Stars** | 13,600+ |
+| **언어** | Python 3.10-3.13 |
+| **LOC** | 약 84,733줄 |
+| **라이선스** | Apache-2.0 |
+| **기반** | AgentScope 1.0.18 |
+
+### 핵심 특징
+
+AgentScope 위에서 동작하는 standalone 개인 AI 비서. Claw 생태계 최다 채널(14개: DingTalk, Feishu, QQ, Xiaoyi, Telegram, WeCom, Mattermost, WeChat, Discord, iMessage, Matrix, MQTT, Voice, Console)을 지원한다. 3-tuple QueueKey `(channel_id, session_id, priority_level)` 기반 UnifiedQueueManager로 head-of-line blocking을 구조적으로 제거하며, Playwright 브라우저 자동화(3,460줄), Skills 시스템, 3단계 보안 스캐닝(tool_guard, file_access_guard, skill_scanner)을 내장한다.
+
+### 신규 패턴 (R42)
+
+| 패턴 | 설명 |
+|------|------|
+| R42: 3-tuple QueueKey 채널-세션-우선순위 격리 | (channel_id, session_id, priority_level) 키로 메시지 큐를 분리; 동적 consumer 생성, 유휴 큐 자동 정리 |
+
+### 참고 링크
+
+- 상세 보고서: [details/copaw_report.md](details/copaw_report.md)
+
+---
+
 ## 종합 비교표
 
 | 도구 | 언어 | 코드량 | RAM | 시작시간 | 핵심 차별점 | Stars |
@@ -982,6 +1069,9 @@ Cloudflare의 "MoltWorker" 프로젝트를 포크하여 Kimi 모델에 최적화
 | **NullClaw** | Zig | ~249K | ~1MB | <2ms | 678KB 정적 바이너리, WASI, Signal+Nostr+Matrix | 6.4K |
 | **Hermes Agent** | Python | - | - | - | 자기개선 루프, Frozen Snapshot 메모리, Skills Trust, Tirith 스캐너 | 9.3K |
 | **Claude Code** | JS+TS | 12MB (번들) | - | - | MCP 채널 표준, seccomp+bwrap 내장 샌드박스, Platform Allowlist, 5겹 인젝션 방어 | N/A (독점) |
+| **GoClaw** | Go 1.26 | 176K LOC | - | <1s | 멀티테넌트 PostgreSQL, 3축 Docker 샌드박스, AES 암호화, Tailscale VPN, OTel 내장 | 1.4K |
+| **AgentScope** | Python 3.10+ | 42K LOC | - | - | OTel-first 관찰가능성, 프롬프트 튜너, 모델 선택기, A2A+MCP, CoPaw·ReMe 모체 | 22K |
+| **CoPaw** | Python 3.10-3.13 | 84K LOC | - | - | 14채널(최다), 3-tuple QueueKey 격리, Playwright 브라우저, Skills 시스템, 3단계 보안 스캔 | 13.6K |
 
 ### 차별화 축 매핑
 
