@@ -27,7 +27,7 @@
 | **Tier 1: Defense-in-Depth** | IronClaw, ZeroClaw | 암호화 볼트 + WASM/Docker 이중 샌드박스 + 다층 인젝션 방어 + HITL 승인 + 비용 제한 |
 | **Tier A+: Sandbox-First** | **NemoClaw**, **Claude Code**, **GoClaw** | OS 레벨 격리 + HITL 또는 소프트 보안 병행. NemoClaw: Docker+Landlock+seccomp+namespace+추론 게이트웨이 격리. **Claude Code**: seccomp BPF+bwrap(Linux)/native sandbox(macOS), npm vendor에 BPF 동봉, 5겹 채널 프롬프트 인젝션 방어, Platform-Controlled Allowlist. **GoClaw**: Docker 3축(mode/access/scope) 샌드박스 + AES 암호화 + OS Keyring + Tailscale VPN + OAuth/RBAC. 암호화 볼트 있음(AES), WASM 없음 |
 | **Tier 2: Container-First** | NanoClaw, OpenClaw, **OpenJarvis**, **Hermes Agent** | Docker/subprocess 격리 + 도구 허용목록 + 자격증명 격리 (암호화 없음) + 부분적 인젝션 방어. OpenJarvis는 Prompt Injection Scanner 명시적 구현, Hermes Agent는 Tirith 외부 바이너리 pre-exec 스캐너 + Memory Injection 탐지 + Skills Trust 4단계 |
-| **Tier 3: Denylist-Based** | Nanobot, PicoClaw, **CoPaw**, **AgentScope** | 정규식/규칙 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음. CoPaw: tool_guard(YAML 규칙) + file_access_guard + skill_security_scanning(정적 분석). AgentScope: hooks 라이프사이클 + MCP 보안(샌드박스 없음) |
+| **Tier 3: Denylist-Based** | Nanobot, PicoClaw, **CoPaw** | 정규식/규칙 기반 명령어 차단 + 파일시스템 제한 + 평문 자격증명 + HITL 없음. CoPaw: tool_guard(YAML 규칙) + file_access_guard + skill_security_scanning(정적 분석) |
 | **Tier 4: Minimal/None** | TinyClaw | 보안 메커니즘 최소 또는 해당 없음 (실험적 용도) |
 
 **가장 주목할 발견 6가지:**
