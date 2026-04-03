@@ -571,7 +571,7 @@ S=최고, A=우수, B+=우수에 가까운 보통, B=보통, C=약함, D=없음/
 | **PicoClaw** | Go | C | — | C | OpenClaw가 너무 크다 → 엣지·임베디드 특화 |
 | **TinyClaw** | TS | D | — | D | 팀 오케스트레이션만. 자체 도구·기억 없음 |
 | **serverless 계열** | 다양 | B | — | B | AWS·Cloudflare 배포 문제만 해결 |
-| **OpenFang** | Rust | **A** | **40** | **S+** | 방향이 다름. Agent OS 선언. Hands+WASM+Taint Tracking |
+| **OpenFang** | Rust | **A** | **40** | A | 방향이 다름. Agent OS 선언. Hands+WASM+Taint Tracking. 실행 중 감시·격리는 S급이나 승인 게이트가 LLM 프롬프트 기반 |
 | **OpenJarvis** | Python+Rust | A | 6 | B+ | 로컬 퍼스트. RBAC 10종·LoRA 자기개선·6 추론엔진 |
 | **NemoClaw** | JS/TS/Py | C | — | **A+** | NVIDIA GPU 샌드박스 플러그인. 범용 아님 |
 | **NullClaw** | Zig | B | 19 | **S** | 678KB·<2ms. 기능보다 존재 방식 자체가 다름 |
@@ -584,17 +584,17 @@ S=최고, A=우수, B+=우수에 가까운 보통, B=보통, C=약함, D=없음/
 **읽는 법**
 - OpenClaw: 기능 S·보안 B — 빠른 성장 속에 보안이 뚫렸다
 - IronClaw·ZeroClaw: 기능 B·보안 S — OpenClaw의 보안 결핍을 메우기 위해 기능을 희생했다
-- OpenFang: 기능 A·보안 S+ — 둘 다 잡으려 한 유일한 시도. 그 대가가 137K LOC
+- OpenFang: 기능 A·보안 A — 둘 다 잡으려 한 유일한 시도. 실행 감시는 S급이나 승인 게이트가 LLM 기반이라 IronClaw·ZeroClaw의 HITL보다 약함
 - NullClaw: 기능 B·보안 S — 기능은 충분하지만 "존재 방식"(678KB 정적 바이너리)이 다른 차원
 
 ### 종합 티어
 
 ```
 Tier S: OpenClaw       -- 기능 완성도 최고. 보안만 보강하면 만능
-        OpenFang       -- Agent OS: 종합 풀스택. 24/7 자율·40채널·16-layer 보안 완비
         CoPaw          -- 채널 최다(14개)+QueueKey 격리+Playwright 브라우저. AgentScope 종속이 약점
 Tier A: IronClaw       -- 보안+기억 최강. 진입장벽이 약점
         ZeroClaw       -- 효율+자아연속성 유일무이. 생태계가 약점
+        OpenFang       -- Agent OS: 40채널+Hands+WASM 감시 최상급. 승인 게이트 LLM 기반이 천장
         NanoClaw       -- 보안+확장 균형. 기억을 MCP로 보강하면 S급 후보
         OpenJarvis     -- 멀티채널 자율 에이전트. A2A+유연한 메모리 강점
         NullClaw       -- 보안 S급+배포 S급. 브라우저 없고 커뮤니티 작은 것이 약점
