@@ -46,8 +46,9 @@ compare_claws의 기존 3계층은 **코드**를 분析 대상으로 삼는다:
 | awesome-openclaw-agents | Awesome List (에이전트 템플릿) | github.com/mergisi/awesome-openclaw-agents | 174개 SOUL.md + 132개 use-case | [details/awesome_openclaw_agents_report.md](details/awesome_openclaw_agents_report.md) |
 | openclaw_seoul_meetup_0315 | 커뮤니티 밋업 | 로컬 — usecases/openclaw_seoul_meetup_0315/ | 16세션 | [details/openclaw_seoul_meetup_0315_report.md](details/openclaw_seoul_meetup_0315_report.md) |
 | agency-agents | 멀티-툴 에이전트 페르소나 컬렉션 | github.com/msitarzewski/agency-agents | 60개+ 에이전트, 8 Division | [details/agency_agents_report.md](details/agency_agents_report.md) |
+| ClawCharts | 생태계 리더보드 대시보드 (GitHub 스타 시계열) | clawcharts.com (웹사이트) | 11개 프레임워크 추적 (653,912★, 7D +10.4%) | [details/clawcharts_report.md](details/clawcharts_report.md) |
 
-**총합**: 4개 항목 | 40 + 174 + 16 + 60 = 290개 실사용 데이터 포인트
+**총합**: 5개 항목 | 40 + 174 + 16 + 60 + 11 = 301개 실사용/추적 데이터 포인트
 
 ---
 
