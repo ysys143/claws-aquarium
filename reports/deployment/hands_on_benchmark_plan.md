@@ -113,13 +113,23 @@ T1 + 요약 스타일을 skill/SKILL.md로 분리 (예: "기술 중심 vs 비즈
 심층 요약을 회신. 3일치 요약 히스토리를 프레임워크 메모리에 유지.
 ```
 
-**T3 (Stretch)**: 멀티-에이전트·HITL·자기개선 검증
+**T3 (Stretch)**: 멀티-에이전트·HITL·자기개선 검증 — **리소스 요구에 따라 3갈래**
 ```
 T2 + "experiment"라고 답하면 Research Agent 스폰해 해당 기사에서
-언급된 모델/도구(예: glm-ocr)를 pip/npm으로 설치·비교 벤치마크 실행 →
-결과를 Telegram 회신. 3개월 후 축적된 session_db에서 자기 개선(스킬
-자동 진화 or config 튜닝) 1회 시도.
+언급된 모델/도구를 비교 벤치마크 실행 → 결과를 Telegram 회신.
+3개월 후 축적된 session_db에서 자기 개선(스킬 자동 진화 or config
+튜닝) 1회 시도.
 ```
+
+T3는 벤치마크 대상 모델이 무엇이냐에 따라 3개 하위 트랙으로 분리한다:
+
+| 하위 트랙 | 벤치마크 대상 예시 | 로컬 리소스 | 권장 인프라 |
+|----------|-------------------|------------|------------|
+| **T3-A (API 기반)** | Claude Vision / GPT-4V / GLM-4V / Qwen-VL-OCR **원격 API** | <1 GB RAM (API 마샬링) | OCI 24GB 상주로 충분 |
+| **T3-B (로컬 경량 CPU)** | pymupdf / tesseract / easyocr | 1–3 GB RAM | OCI 24GB 상주로 충분 |
+| **T3-C (로컬 ML)** | olmOCR / Nougat / Marker / GLM-4V-OCR **로컬 inference** | **8–40 GB + GPU** | **Burst GPU 필수** (§4.5 참조) |
+
+**원칙**: 상주 인프라는 OCI 24GB에 고정, T3-C 같은 일회성 GPU 부하는 burst 리소스로 분리한다. **한 번의 로컬 ML OCR 벤치마크 세션 = ~4–8시간 × $0.4–2/hr = $5–15**. 상시 GPU 인스턴스($200–500/월) 구독 대비 10–50배 경제적.
 
 ### 4.2 태스크 선정 이유
 
@@ -130,7 +140,7 @@ T1 혼자서도 이미 핵심 축들을 커버:
 - **LLM 도구 호출** (fetch + summarize)
 - **24h 데몬 안정성**
 
-T2/T3는 Hermes·MetaClaw 등 기능 풍부한 프레임워크에서만 구현 시도. **IronClaw/ZeroClaw/TinyClaw 같은 경량은 T1에서 멈춤**.
+T2/T3A/T3B는 Hermes·MetaClaw 등 기능 풍부한 프레임워크에서만 구현 시도. **IronClaw/ZeroClaw/TinyClaw 같은 경량은 T1에서 멈춤**. **T3-C는 별도 burst GPU가 필요하므로 에이전트가 오케스트레이션할 수 있는 프레임워크(Hermes + Modal 등)에서만 시도**.
 
 ### 4.3 입력·출력 고정
 
@@ -153,6 +163,82 @@ T2/T3는 Hermes·MetaClaw 등 기능 풍부한 프레임워크에서만 구현 �
 | **중복 전송** | 0건 |
 | **24h 연속 운전** | 사람 개입 없이 3일 이상 |
 | **복구 시간 (crash 후)** | < 5분 (자동 재시작) |
+
+### 4.5 Burst GPU 오케스트레이션 (T3-C 전용)
+
+T3-C(로컬 ML OCR 벤치마크)는 상주 24GB ARM으로 돌릴 수 없다. 에이전트가 자체적으로 GPU 인스턴스를 프로비저닝·실행·teardown 하는 3가지 경로:
+
+| 경로 | 오케스트레이션 난이도 | 대표 프로바이더 | Hermes 통합도 | 비용 모델 |
+|------|---------------------|---------------|---------------|----------|
+| **① 서버리스 함수** | ⭐ 낮음 | **Modal** (GPU 데코레이터), Baseten | ✅ **Hermes 6 터미널 백엔드 중 하나** — 네이티브 | 초당 과금, auto-shutdown |
+| **② 서버리스 추론 API** | ⭐ 낮음 | Replicate, Together.ai, DashScope, OpenRouter | 기존 Hermes tool use 패턴 | inference당 과금 |
+| **③ 직접 GPU provider API** | ⭐⭐⭐ 중간 | RunPod, Vast.ai, Lambda Labs | 커스텀 툴 필요 | 시간당 과금, spot 가능 |
+
+#### 추천 구현 — Option ① Hermes + Modal
+
+```python
+# Hermes 스킬 내부에 Modal 함수 정의
+import modal
+
+stub = modal.Stub("ocr-bench")
+image = modal.Image.debian_slim().pip_install("olmocr", "torch", "transformers")
+
+@stub.function(gpu="L4", image=image, timeout=3600)
+def run_olmocr(pdfs: list[bytes]) -> list[str]:
+    from olmocr import OlmOCRPipeline
+    pipe = OlmOCRPipeline.from_pretrained("allenai/olmOCR-7B-0225-preview")
+    return [pipe(pdf) for pdf in pdfs]
+
+# Research Agent가 일반 함수처럼 호출 — Modal이 GPU auto-provision + teardown
+results = run_olmocr.remote(pdf_batch)
+```
+
+**장점**: 에이전트 관점에서 그냥 함수 호출. 프로비저닝·SSH·teardown 전부 Modal 자동. Hermes 에이전트가 Tirith(R22)로 스킬의 모델 설치 명령까지 pre-exec 검증 가능.
+
+#### 에이전트가 처리할 수 있는 lifecycle
+
+| 단계 | 자동화 가능? | 메커니즘 |
+|------|-------------|----------|
+| "GPU 필요" 판단 | ✅ | 스킬 메타데이터에 `requires_gpu: true` |
+| 프로비저닝 트리거 | ✅ | Modal: 함수 호출 / RunPod: REST API |
+| 코드/데이터 전송 | ✅ | Modal: Image 자동 빌드 / RunPod: S3 마운트 |
+| 결과 수신 | ✅ | Modal: 함수 반환값 / RunPod: S3 download |
+| 실패 재시도 (preemption/timeout) | ⚠️ 중간 | Hermes R21 bounded delegation + provider retry decorator |
+| 비용 기록 | ✅ | Modal invoice API → Telegram 알림 |
+| **중복 방지** | ✅ | **R46 LLM Wiki 캐시 조회** — "이 모델 × 이 데이터셋 이미 벤치마크함" 자동 감지 |
+
+#### 필수 안전장치 5가지
+
+1. **Pre-paid 계정 + Hard spending cap**
+   - Modal workspace $20/월 / RunPod 잔고 $10 프리페이드
+   - **Postpaid GCP 피할 것** — 버그 루프로 무한 빌링 가능
+2. **Per-function 시간 제한**: Modal `timeout=3600` (1시간), RunPod `podStopTimeMinutes`
+3. **Tirith 체크 (R22)**: GPU 이미지에 포함되는 바이너리(`olmocr`, `torch` wheel 등) SHA-256 + cosign 서명 검증 → 공급망 공격 차단
+4. **Telegram 승인 게이트**: 첫 GPU 호출은 사용자 승인 (두 번째부터 같은 스킬이면 auto). R17 Frozen Snapshot에 "이 스킬 approved" 저장
+5. **Dry-run 먼저**: 실제 GPU 돌리기 전 CPU로 입출력 shape 검증 → 첫 $0.xx로 버그 발견
+
+#### 프레임워크별 T3-C 구현 가능성
+
+| 프레임워크 | Modal 네이티브 | T3-C 실현 경로 |
+|-----------|---------------|----------------|
+| **Hermes** | ✅ 터미널 백엔드 | Option ① (가장 깔끔) |
+| **OpenClaw** | ❌ | Option ②/③ 커스텀 툴 |
+| **IronClaw** | ❌ | Option ② (WASM 샌드박스와 궁합) |
+| **GoClaw** | ❌ | Option ③ (Tailscale tsnet으로 외부 GPU 접속) |
+| **CoPaw** | ❌ | Option ② |
+| **MetaClaw** | ⚠️ Tinker 클라우드 LoRA만 | Option ②/③ |
+
+**비고**: Hermes 선택이 burst GPU 오케스트레이션에서도 유리. Modal 네이티브 통합이 다른 프레임워크 대비 결정적 우위.
+
+#### 예상 월 운영비 (T3-C 포함)
+
+| 항목 | 월 비용 |
+|------|--------|
+| OCI Always Free (상주) | $0 |
+| Claude API (T1/T2 + T3-A 벤치마크) | $30–60 |
+| Modal GPU burst (T3-C 월 1–2회) | $5–15 |
+| 서버리스 추론 API (T3-A 복수 모델) | $5–20 (선택) |
+| **월 총** | **$40–95** |
 
 ---
 
@@ -300,7 +386,7 @@ T2/T3는 Hermes·MetaClaw 등 기능 풍부한 프레임워크에서만 구현 �
 | 결정 | 옵션 | 추천 근거 |
 |------|------|----------|
 | **일정** | A(순차) / B(병행) / C(pre-build 후 본 구축) | **C 추천** — 결정 위험 최소화 |
-| **벤치마크 태스크 Tier** | T1만 / T1+T2 / T1+T2+T3 | **T1+T2** (T3는 Hermes·MetaClaw만 선택) |
+| **벤치마크 태스크 Tier** | T1만 / T1+T2 / T1+T2+T3-A·B / T1+T2+T3-A·B·C | **T1+T2+T3-A** (T3-B/C는 Hermes에서만 선택적). T3-C는 §4.5 Burst GPU 세팅 완료 전까진 보류 |
 | **프레임워크 6개 범위** | 현재 6개 고정 / 4개로 축소 / 8개로 확장 | **현재 6개** — Phase 1 완료 후 Phase 2 재평가 |
 
 **선결 작업** (어느 옵션이든 공통):
