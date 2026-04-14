@@ -18,6 +18,7 @@
    - 3.4 Moltbook API
    - 3.5 Xiaomi MiClaw
    - 3.6 MetaClaw
+   - 3.7 Paperclip
 4. [교차 분석](#4-교차-분석)
 5. [선행 보고서와의 연결](#5-선행-보고서와의-연결)
 6. [결론 및 열린 질문](#6-결론-및-열린-질문)
@@ -36,6 +37,7 @@
 | **에이전트 소셜 플랫폼** | Moltbook API | AI 에이전트를 위한 소셜 네트워크 (Reddit/X 스타일, 어떤 Claw도 미의존) |
 | **모바일 OS 네이티브 에이전트** | Xiaomi MiClaw | HyperOS 시스템 레이어 통합, 50+ OS API 직접 호출, IoT 생태계 컨텍스트 주입 (비공개) |
 | **에이전트 메타 레이어 (스킬+메모리+RL)** | MetaClaw | OpenAI-compatible 프록시로 7개+ Claw 백엔드를 추상화. 스킬 주입, 세션 간 메모리, GRPO RL + MadMax 유휴-창 훈련 |
+| **에이전트 조직 오케스트레이션** | Paperclip | 이종 Claw 런타임 7종(Claude Code/OpenClaw/Codex/Cursor/Gemini/OpenCode/pi)을 한 회사의 직원으로 묶는 메타 레이어. Heartbeat 기동, Ticket 체크아웃, 월간 예산, 승인 게이트, 불변 감사. **53k★** |
 
 **가장 주목할 발견 3가지:**
 
@@ -509,3 +511,28 @@ security_report.md는 "자격증명 암호화를 구현한 곳은 IronClaw와 Ze
 - **HyperOS 통합**: 시스템 서비스 레벨 에이전트 (앱이 아닌 OS 기능)
 - **Human × Car × Home**: 사용자 위치 + IoT 기기 상태 + 차량을 LLM 컨텍스트로 실시간 주입
 - **신규 패턴**: R27 (OS-Native Agent Runtime), R28 (Physical World Context Injection)
+
+---
+
+### 3.7 Paperclip — 이종 Claw 런타임을 묶는 회사 오케스트레이션
+
+> **상세 분석**: `reports/repos_applied/details/paperclip_report.md`
+
+**핵심 철학**: "If OpenClaw is an _employee_, Paperclip is the _company_." (README L32)
+
+서로 다른 Claw 런타임(Claude Code, OpenClaw, Codex, Cursor, Gemini, OpenCode, pi)의 에이전트들을 한 회사의 직원으로 묶고 조직도·목표·이슈·월간 예산·승인 게이트·불변 감사 로그를 덮어씌우는 메타 오케스트레이션 레이어.
+
+**규모 (2026-04-14 기준)**: Stars 53,248 / Forks 8,940 / TypeScript 97% / ~251,900 LOC / MIT / 서비스 74개 / DB 테이블 60+
+
+**핵심 특징**:
+- **이종 런타임 어댑터 7종**: `packages/adapters/{claude,codex,cursor,gemini,openclaw-gateway,opencode,pi}-local/`. 6개는 `agentTaskSessions` 기반 세션 재개 지원; `openclaw-gateway`는 게이트웨이가 세션 관리.
+- **Heartbeat 기동 모델** (R43): 4개 소스(`timer`/`assignment`/`on_demand`/`automation`)를 단일 파이프라인으로 통합. 자체 zero-dep cron parser(`cron.ts`, 373L) + per-agent `Map<string, Promise<void>>` 직렬화 락. 외부 Redis/SQS 큐 미사용.
+- **Stale-Aware Atomic Checkout** (R44): `FOR UPDATE` 행락 + `adoptStaleCheckoutRun()` CAS 패턴으로 작업자 크래시 시 안전한 이슈 재할당. 외부 브로커 없이 Postgres 단일 DB로 구현(`server/src/services/issues.ts:864-909`).
+- **이종 런타임 조직도** (R45): N 에이전트 × N 런타임 × 영속 조직. MetaClaw R35(1 에이전트 × N 백엔드 스왑)와 보완적.
+- **거버넌스 스택**: `approvals` + `issue_approvals` 승인 게이트 / 정책 기반 예산 eventual-consistency 집행(`budgets.ts` 958L, auto-pause) / 불변 `activity_log` / `companyId` 멀티 테넌트 격리 / `company_secrets` 회사 스코프 자격증명 / Better-Auth 인증.
+- **스킬 시스템**: SKILL.md 포맷 + `buildSkillRuntimeName()` 번들/커스텀 네임스페이싱. 번들 4개(`paperclip`, `paperclip-create-agent`, `paperclip-create-plugin`, `para-memory-files`).
+- **Coming Soon — Clipmart**: 사전 제작 "회사 템플릿"(조직 구조 + 에이전트 설정 + 스킬) 마켓플레이스. Claw 생태계 최초의 "회사 단위 공유 아티팩트" 시도.
+
+**보안 Tier**: **Tier 3** (정책/감사 기반) — 런타임 샌드박싱은 기저 어댑터(예: Claude Code의 seccomp+bwrap R26)에 위임. 자체 암호화 볼트는 없음.
+
+**신규 패턴**: R43 (Multi-Source Heartbeat Activation), R44 (Stale-Aware Atomic Task Checkout), R45 (Heterogeneous-Runtime Org Chart).
