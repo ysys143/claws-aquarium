@@ -1,12 +1,112 @@
-# OMC
+# ===== macOS =====
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+.AppleDouble
+.LSOverride
+
+# ===== Windows =====
+Thumbs.db
+Desktop.ini
+ehthumbs.db
+
+# ===== IDE / Editors =====
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursorignore
+.aider*
+
+# ===== Logs =====
+*.log
+firebase-debug.log*
+firebase-debug.*.log*
+.firebase/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ===== Environment / Secrets =====
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+!.env.example
+!.env.sample
+*.pem
+*.key
+secrets/
+
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+.tox/
+pip-log.txt
+pip-delete-this-directory.txt
+htmlcov/
+.hypothesis/
+
+# ===== Node / JavaScript / TypeScript =====
+node_modules/
+dist/
+build/
+.next/
+out/
+.nuxt/
+.turbo/
+.cache/
+.parcel-cache/
+*.tsbuildinfo
+.pnp.*
+.yarn/cache
+.yarn/unplugged
+.yarn/build-state.yml
+.yarn/install-state.gz
+
+# ===== Coverage =====
+coverage/
+.coverage
+.coverage.*
+.nyc_output/
+lcov.info
+
+# ===== Rust =====
+target/
+Cargo.lock.bak
+
+# ===== Go =====
+*.test
+*.out
+
+# ===== Zig =====
+zig-cache/
+zig-out/
+
+# ===== Ruby =====
+.bundle/
+vendor/bundle
+
+# ===== Project-specific =====
 .omc/
-
-# Playwright
 .playwright-mcp/
-
-# CWF
-.cwf/
-
-# macOS
-.DS_Store.omc/
 .cwf/
